@@ -100,7 +100,7 @@ export default function Footer({ onNavigate }) {
 
         {/* Bottom Bar */}
         <div className="border-t border-gray-200 pt-8 flex flex-col md:flex-row items-center justify-between gap-4 text-sm">
-          <p>&copy; {new Date().getFullYear()} Zudo Groceries. All rights reserved.</p>
+          <p>&copy; {new Date().getFullYear()} Zudo. All rights reserved.</p>
           <div className="flex gap-4">
             <a href="#" className="hover:text-green-600 transition-colors">Privacy Policy</a>
             <a href="#" className="hover:text-green-600 transition-colors">Terms of Service</a>

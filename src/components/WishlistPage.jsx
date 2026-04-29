@@ -2,7 +2,7 @@ import React from 'react';
 import ProductCard from './ProductCard';
 import { Heart, ArrowLeft } from 'lucide-react';
 
-export default function WishlistPage({ wishlistItems, onAddToCart, onToggleWishlist, onNavigate, onNavigateToProduct }) {
+export default function WishlistPage({ wishlistItems, cartItems = [], onAddToCart, onUpdateQuantity, onToggleWishlist, onNavigate, onNavigateToProduct, isB2B, getDisplayPrice }) {
   if (wishlistItems.length === 0) {
     return (
       <div className="container mx-auto px-6 py-20 flex flex-col items-center justify-center min-h-[60vh]">
@@ -32,22 +32,35 @@ export default function WishlistPage({ wishlistItems, onAddToCart, onToggleWishl
 
       <div className="flex items-center justify-between mb-10">
         <div>
-          <h1 className="text-3xl md:text-4xl font-extrabold text-gray-900 mb-2">My Wishlist</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-3xl md:text-4xl font-extrabold text-gray-900 mb-2">My Wishlist</h1>
+            {isB2B && (
+              <span className="bg-emerald-600 text-white text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest">B2B Prices</span>
+            )}
+          </div>
           <p className="text-gray-500 font-medium">{wishlistItems.length} items saved</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-        {wishlistItems.map(product => (
-          <div onClick={() => onNavigateToProduct && onNavigateToProduct(product)} key={product.id} className="cursor-pointer h-full">
-            <ProductCard 
-              product={product} 
-              onAddToCart={onAddToCart} 
-              onToggleWishlist={onToggleWishlist}
-              isWishlisted={true}
-            />
-          </div>
-        ))}
+        {wishlistItems.map(product => {
+          const cartItem = cartItems.find(item => item.id === product.id);
+          const displayData = getDisplayPrice ? getDisplayPrice(product) : { price: product.price, oldPrice: product.oldPrice };
+          const productWithPrice = { ...product, ...displayData };
+
+          return (
+            <div onClick={() => onNavigateToProduct && onNavigateToProduct(productWithPrice)} key={product.id} className="cursor-pointer h-full">
+              <ProductCard 
+                product={productWithPrice} 
+                onAddToCart={onAddToCart} 
+                onUpdateQuantity={onUpdateQuantity}
+                onToggleWishlist={onToggleWishlist}
+                isWishlisted={true}
+                quantity={cartItem ? cartItem.quantity : 0}
+              />
+            </div>
+          );
+        })}
       </div>
     </div>
   );

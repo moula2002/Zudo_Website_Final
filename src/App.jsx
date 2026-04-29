@@ -14,6 +14,7 @@ import WishlistPage from './components/WishlistPage';
 import ProductsPage from './components/ProductsPage';
 import ProductDetails from './components/ProductDetails';
 import ContactPage from './components/ContactPage';
+import B2BVerificationScreen from './components/B2BVerificationScreen';
 import './App.css';
 
 function App() {
@@ -24,6 +25,9 @@ function App() {
   const [toastMessage, setToastMessage] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedProduct, setSelectedProduct] = useState(null);
+  const [selectedCategory, setSelectedCategory] = useState('All');
+
+  const [selectedSubcategory, setSelectedSubcategory] = useState('All');
 
   // Scroll to top when page changes
   useEffect(() => {
@@ -36,24 +40,37 @@ function App() {
   };
 
   const addToCart = (product) => {
+    const initialQty = isB2B ? 4 : 1;
     setCartItems(prev => {
       const existing = prev.find(item => item.id === product.id);
       if (existing) {
         return prev.map(item => item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item);
       }
-      return [...prev, { ...product, quantity: 1 }];
+      return [...prev, { ...product, quantity: initialQty }];
     });
     showToast(`${product.name} added to cart!`);
   };
 
   const updateCartQuantity = (id, delta) => {
-    setCartItems(prev => prev.map(item => {
-      if (item.id === id) {
-        const newQty = item.quantity + delta;
-        return newQty > 0 ? { ...item, quantity: newQty } : item;
-      }
-      return item;
-    }));
+    const minQty = isB2B ? 4 : 1;
+    setCartItems(prev => {
+      const updated = prev.map(item => {
+        if (item.id === id) {
+          let newQty = item.quantity + delta;
+          // In B2B mode, if quantity drops below the minimum (4), we set it to 0 to remove it
+          if (isB2B && newQty < 4 && delta < 0) {
+            newQty = 0;
+          }
+          return { ...item, quantity: newQty };
+        }
+        return item;
+      }).filter(item => item.quantity > 0);
+      
+      const removed = prev.find(item => item.id === id && item.quantity === minQty && delta === -1);
+      if (removed) showToast(`${removed.name} removed from cart.`);
+      
+      return updated;
+    });
   };
 
   const removeFromCart = (id) => setCartItems(prev => prev.filter(item => item.id !== id));
@@ -68,9 +85,18 @@ function App() {
 
   const handleSearch = (query) => {
     setSearchQuery(query);
+    setSelectedCategory('All'); 
+    setSelectedSubcategory('All');
     if (query.trim() !== '') {
       setCurrentPage('products');
     }
+  };
+
+  const handleCategoryClick = (category, subcategory = 'All') => {
+    setSelectedCategory(category);
+    setSelectedSubcategory(subcategory);
+    setSearchQuery(''); 
+    setCurrentPage('products');
   };
 
   const navigateToProduct = (product) => {
@@ -78,19 +104,64 @@ function App() {
     setCurrentPage('productDetails');
   };
 
+  const [isB2B, setIsB2B] = useState(false);
+  const [b2bStatus, setB2bStatus] = useState('none'); // 'none', 'pending', 'approved'
+
+  useEffect(() => {
+    const handleB2BLogin = () => {
+      setB2bStatus('pending');
+    };
+    window.addEventListener('b2b-login', handleB2BLogin);
+    return () => window.removeEventListener('b2b-login', handleB2BLogin);
+  }, []);
+
+  const handleB2BApproval = () => {
+    setB2bStatus('approved');
+    setIsB2B(true);
+    showToast('B2B Account Approved! Welcome to Zudo Business.');
+  };
+
+  const getDisplayPrice = (product) => {
+    if (!isB2B) return { price: product.price, oldPrice: product.oldPrice };
+    
+    // Parse numeric value from "₹140/kg"
+    const match = product.price.match(/₹(\d+)/);
+    if (!match) return { price: product.price, oldPrice: product.oldPrice };
+    
+    const basePrice = parseInt(match[1]);
+    const b2bPriceValue = Math.floor(basePrice * 0.75); // 25% bulk discount
+    const unit = product.price.split('/')[1] || 'kg';
+    
+    return { 
+      price: `₹${b2bPriceValue}/${unit}`, 
+      oldPrice: product.price, // Show original price as old price for B2B
+      isB2B: true
+    };
+  };
+
   return (
     <div className="min-h-screen bg-[#f8f9fa] text-gray-900 font-sans overflow-x-hidden relative flex flex-col">
       <Navbar 
-        cartCount={cartItems.reduce((acc, item) => acc + item.quantity, 0)} 
+        cartCount={cartItems.length} 
         wishlistCount={wishlistItems.length}
         onLoginClick={() => setIsLoginOpen(true)} 
         onNavigate={setCurrentPage}
         onSearch={handleSearch}
+        onCategoryClick={handleCategoryClick}
         onNavigateToProduct={navigateToProduct}
         currentPage={currentPage}
+        isB2B={isB2B}
+        onLogout={() => { setIsB2B(false); setB2bStatus('none'); showToast('Logged out successfully.'); }}
       />
       
-      <div className="flex-grow flex flex-col">
+      {b2bStatus === 'pending' && (
+        <B2BVerificationScreen 
+          onSkip={handleB2BApproval} 
+          onBack={() => setB2bStatus('none')} 
+        />
+      )}
+      
+      <div className="flex-grow flex flex-col pt-[72px]">
         {currentPage === 'home' && (
           <>
             <div className="relative bg-gradient-to-br from-[#064e3b] via-[#0f766e] to-[#064e3b] text-white overflow-hidden">
@@ -105,11 +176,11 @@ function App() {
               </div>
             </div>
             
-            <TopCategories onNavigate={setCurrentPage} />
+            <TopCategories onNavigate={setCurrentPage} onCategoryClick={handleCategoryClick} />
             <Showcase />
-            <HomeProducts onAddToCart={addToCart} onToggleWishlist={toggleWishlist} wishlistItems={wishlistItems} onNavigateToProduct={navigateToProduct} onNavigate={setCurrentPage} />
+            <HomeProducts onAddToCart={addToCart} onUpdateQuantity={updateCartQuantity} onToggleWishlist={toggleWishlist} cartItems={cartItems} wishlistItems={wishlistItems} onNavigateToProduct={navigateToProduct} onNavigate={setCurrentPage} isB2B={isB2B} getDisplayPrice={getDisplayPrice} />
             <PromoBanner onNavigate={setCurrentPage} />
-            <HomeNeeds onAddToCart={addToCart} onToggleWishlist={toggleWishlist} wishlistItems={wishlistItems} onNavigateToProduct={navigateToProduct} onNavigate={setCurrentPage} />
+            <HomeNeeds onAddToCart={addToCart} onUpdateQuantity={updateCartQuantity} onToggleWishlist={toggleWishlist} cartItems={cartItems} wishlistItems={wishlistItems} onNavigateToProduct={navigateToProduct} onNavigate={setCurrentPage} isB2B={isB2B} getDisplayPrice={getDisplayPrice} />
             <Testimonials />
           </>
         )}
@@ -117,10 +188,16 @@ function App() {
         {currentPage === 'products' && (
           <ProductsPage 
             searchQuery={searchQuery}
+            initialCategory={selectedCategory}
+            initialSubcategory={selectedSubcategory}
             onAddToCart={addToCart}
+            onUpdateQuantity={updateCartQuantity}
             onToggleWishlist={toggleWishlist}
+            cartItems={cartItems}
             wishlistItems={wishlistItems}
             onNavigateToProduct={navigateToProduct}
+            isB2B={isB2B}
+            getDisplayPrice={getDisplayPrice}
           />
         )}
 
@@ -148,10 +225,14 @@ function App() {
         {currentPage === 'wishlist' && (
           <WishlistPage 
             wishlistItems={wishlistItems} 
+            cartItems={cartItems}
             onAddToCart={addToCart} 
+            onUpdateQuantity={updateCartQuantity}
             onToggleWishlist={toggleWishlist} 
             onNavigate={setCurrentPage} 
             onNavigateToProduct={navigateToProduct}
+            isB2B={isB2B}
+            getDisplayPrice={getDisplayPrice}
           />
         )}
 

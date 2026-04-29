@@ -1,67 +1,136 @@
 import React from 'react';
-import { Heart, Plus, Star } from 'lucide-react';
+import { Heart, Plus, Minus, Star } from 'lucide-react';
 
-export default function ProductCard({ product, onAddToCart, onToggleWishlist, isWishlisted }) {
+export default function ProductCard({ product, onAddToCart, onUpdateQuantity, onToggleWishlist, isWishlisted, quantity = 0 }) {
   return (
-    <div className="bg-white rounded-[2rem] p-2 transition-all duration-500 group relative border border-gray-100 hover:border-emerald-100 hover:shadow-[0_20px_40px_-15px_rgba(16,185,129,0.15)] flex flex-col h-full">
+    <div className="bg-white rounded-[2.5rem] p-3 transition-all duration-500 group relative border border-gray-100 hover:border-emerald-200 hover:shadow-[0_30px_60px_-15px_rgba(6,78,59,0.12)] flex flex-col h-full transform hover:-translate-y-2">
       
       {/* Top Image Section */}
-      <div className="w-full h-56 bg-gradient-to-br from-gray-50 to-gray-100 rounded-[1.5rem] mb-4 overflow-hidden relative group-hover:shadow-inner transition-all">
+      <div className="w-full h-64 bg-[#fdfdfd] rounded-[2rem] overflow-hidden relative transition-all duration-500">
         {product.badge && (
-          <span className="absolute top-3 left-3 bg-white/90 backdrop-blur-md text-emerald-700 text-[10px] font-extrabold px-3 py-1.5 rounded-full z-10 shadow-sm uppercase tracking-widest">
-            {product.badge}
-          </span>
+          <div className="absolute top-4 left-4 z-10 flex flex-col gap-2">
+            <span className="bg-[#107569] text-white text-[10px] font-black px-3 py-1.5 rounded-full shadow-lg shadow-[#107569]/20 uppercase tracking-widest animate-pulse">
+              {product.badge}
+            </span>
+          </div>
         )}
         
         <button 
           onClick={(e) => { e.stopPropagation(); onToggleWishlist && onToggleWishlist(product); }}
-          className={`absolute top-3 right-3 z-10 p-2 rounded-full shadow-sm backdrop-blur-md transition-all duration-300 transform active:scale-90 ${isWishlisted ? 'bg-red-50 text-red-500' : 'bg-white/80 text-gray-400 hover:text-red-500 hover:bg-white'}`}
+          className={`absolute top-4 right-4 z-10 p-2.5 rounded-full shadow-xl backdrop-blur-xl transition-all duration-300 transform hover:scale-110 active:scale-95 ${isWishlisted ? 'bg-red-500 text-white shadow-red-500/30' : 'bg-white/90 text-gray-400 hover:text-red-500 hover:bg-white'}`}
         >
-          <Heart size={18} className={isWishlisted ? "fill-red-500" : ""} />
+          <Heart size={18} className={isWishlisted ? "fill-white" : ""} />
         </button>
         
         {product.image ? (
           <img 
             src={product.image} 
             alt={product.name} 
-            className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700"
+            className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-1000 ease-out"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-6xl opacity-80 group-hover:scale-110 transition-transform duration-500">
+          <div className="w-full h-full flex items-center justify-center text-7xl opacity-80 group-hover:scale-110 transition-transform duration-700">
             🛍️
           </div>
         )}
 
-        {/* Subtle dark overlay on hover to make badge/heart pop */}
-        <div className="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
+        {/* Action Overlay (Desktop Only) */}
+        <div className="absolute inset-x-0 bottom-0 p-4 translate-y-full group-hover:translate-y-0 transition-transform duration-500 ease-out z-20 hidden md:block">
+          <div className="bg-white/90 backdrop-blur-md rounded-2xl p-3 shadow-2xl flex items-center justify-between border border-white/20">
+             <div className="flex flex-col">
+               <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tight">Price per unit</span>
+               <span className="text-sm font-black text-[#107569]">{product.price}</span>
+             </div>
+             {quantity > 0 ? (
+               <div className="flex items-center gap-1.5 bg-[#107569] rounded-lg p-0.5 shadow-lg shadow-[#107569]/30">
+                 <button 
+                   onClick={(e) => { e.stopPropagation(); onUpdateQuantity && onUpdateQuantity(product.id, -1); }}
+                   className="w-6 h-6 rounded-md flex items-center justify-center text-white hover:bg-white/20 transition-colors"
+                 >
+                   <Minus size={12} strokeWidth={3} />
+                 </button>
+                 <span className="text-white font-black text-xs min-w-[1rem] text-center">{quantity}</span>
+                 <button 
+                   onClick={(e) => { e.stopPropagation(); onUpdateQuantity && onUpdateQuantity(product.id, 1); }}
+                   className="w-6 h-6 rounded-md flex items-center justify-center text-white hover:bg-white/20 transition-colors"
+                 >
+                   <Plus size={12} strokeWidth={3} />
+                 </button>
+               </div>
+             ) : (
+               <button 
+                 onClick={(e) => { e.stopPropagation(); onAddToCart && onAddToCart(product); }}
+                 className="bg-[#107569] text-white w-8 h-8 rounded-xl flex items-center justify-center hover:bg-[#0d6359] transition-colors shadow-lg shadow-[#107569]/30"
+               >
+                 <Plus size={18} strokeWidth={3} />
+               </button>
+             )}
+          </div>
+        </div>
+
+        {/* Subtle dark overlay */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
       </div>
       
       {/* Content Section */}
-      <div className="flex-grow px-4 pb-4 flex flex-col">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-emerald-600 text-xs font-bold uppercase tracking-wider">{product.category || 'Grocery'}</span>
-          <div className="flex items-center gap-1 bg-yellow-50 px-2 py-0.5 rounded-md">
-            <Star size={12} className="fill-yellow-400 text-yellow-400" />
-            <span className="text-yellow-700 text-xs font-bold">{product.rating}</span>
+      <div className="flex-grow px-4 pt-3 pb-1 flex flex-col">
+        <div className="flex items-center flex-wrap gap-2 mb-3">
+          <span className="bg-[#107569]/5 text-[#107569] text-[10px] font-black px-2.5 py-1 rounded-lg uppercase tracking-wider">{product.category || 'Grocery'}</span>
+          {product.subcategory && (
+            <span className="bg-emerald-100/30 text-emerald-600 text-[9px] font-bold px-2 py-0.5 rounded-md border border-emerald-100 tracking-wide">
+              {product.subcategory}
+            </span>
+          )}
+          <div className="flex items-center gap-1 bg-amber-50 px-2 py-1 rounded-lg border border-amber-100/50">
+            <Star size={12} className="fill-amber-400 text-amber-400" />
+            <span className="text-amber-700 text-[10px] font-black">{product.rating}</span>
           </div>
         </div>
         
-        <h3 className="text-gray-900 font-extrabold mb-1 line-clamp-2 text-lg leading-tight group-hover:text-emerald-700 transition-colors">
+        <h3 className="text-gray-900 font-black leading-tight group-hover:text-[#107569] transition-colors line-clamp-2 min-h-[2.5rem]">
           {product.name}
         </h3>
         
-        <div className="mt-auto pt-4 flex items-end justify-between">
+        <div className="mt-1 pt-3 border-t border-gray-50 flex items-center justify-between">
           <div className="flex flex-col">
-            <span className="text-gray-400 text-xs line-through font-medium mb-1">{product.oldPrice}</span>
-            <span className="text-gray-900 font-black text-2xl leading-none">{product.price}</span>
+            {product.oldPrice && (
+              <span className="text-gray-400 text-[11px] line-through font-bold mb-0.5 tracking-tight">{product.oldPrice}</span>
+            )}
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-[#107569] font-black text-xl tracking-tighter">{product.price}</span>
+              {product.isB2B && (
+                <div className="flex items-center gap-1.5 mt-1">
+                  <span className="text-[8px] font-black bg-gray-900 text-white px-1.5 py-0.5 rounded uppercase tracking-tighter">B2B</span>
+                  <span className="text-[8px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100 uppercase tracking-tighter">Min Qty: 4</span>
+                </div>
+              )}
+            </div>
           </div>
           
-          <button 
-            onClick={(e) => { e.stopPropagation(); onAddToCart && onAddToCart(product); }}
-            className="bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white h-11 px-5 rounded-xl font-extrabold text-sm flex items-center justify-center gap-2 transition-all duration-300 transform active:scale-95 shadow-sm hover:shadow-lg hover:shadow-emerald-600/30"
-          >
-            <Plus size={18} strokeWidth={3} /> Add
-          </button>
+          {quantity > 0 ? (
+            <div className="md:hidden flex items-center gap-3 bg-[#107569] rounded-2xl p-1 shadow-lg shadow-[#107569]/20">
+              <button 
+                onClick={(e) => { e.stopPropagation(); onUpdateQuantity && onUpdateQuantity(product.id, -1); }}
+                className="w-7 h-7 rounded-xl flex items-center justify-center text-white hover:bg-white/20 transition-colors"
+              >
+                <Minus size={14} strokeWidth={3} />
+              </button>
+              <span className="text-white font-black text-sm w-4 text-center">{quantity}</span>
+              <button 
+                onClick={(e) => { e.stopPropagation(); onUpdateQuantity && onUpdateQuantity(product.id, 1); }}
+                className="w-7 h-7 rounded-xl flex items-center justify-center text-white hover:bg-white/20 transition-colors"
+              >
+                <Plus size={14} strokeWidth={3} />
+              </button>
+            </div>
+          ) : (
+            <button 
+              onClick={(e) => { e.stopPropagation(); onAddToCart && onAddToCart(product); }}
+              className="md:hidden bg-[#107569] text-white w-8 h-8 rounded-2xl flex items-center justify-center transition-all duration-300 shadow-lg shadow-[#107569]/20 active:scale-90"
+            >
+              <Plus size={18} strokeWidth={3} />
+            </button>
+          )}
         </div>
       </div>
     </div>

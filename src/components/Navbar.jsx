@@ -2,10 +2,44 @@ import React, { useState } from 'react';
 import { ShoppingCart, ChevronDown, Menu, Heart, Search, X, Wheat, Leaf, ShoppingBag, Package, Coffee } from 'lucide-react';
 import { allProducts } from '../data';
 
-export default function Navbar({ cartCount = 0, wishlistCount = 0, onLoginClick, onNavigate, onSearch, onNavigateToProduct, currentPage = 'home' }) {
+export default function Navbar({ cartCount = 0, wishlistCount = 0, onLoginClick, onNavigate, onSearch, onCategoryClick, onNavigateToProduct, currentPage = 'home', isB2B = false, onLogout }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [localSearchQuery, setLocalSearchQuery] = useState('');
+  const [activeMegaCategory, setActiveMegaCategory] = useState('Rice');
+
+  const megaData = {
+    'Rice': {
+      icon: <Wheat size={16} />,
+      items: [
+        { name: 'Basmati Rice', sub: 'Basmati', img: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&q=80&w=200' },
+        { name: 'Sona Masoori', sub: 'Sona Masoori', img:'https://pipingpotcurry.com/wp-content/uploads/2020/02/Sona-Masoori-White-Rice-Piping-Pot-Curry.jpg' }
+      ]
+    },
+    'Pulses': {
+      icon: <Leaf size={16} />,
+      items: [
+        { name: 'Premium Dals', sub: 'Dals', img: 'https://5.imimg.com/data5/SELLER/Default/2023/1/LJ/XB/NO/182527119/yellow-toor-dal-1000x1000.JPG' },
+        { name: 'Beans & Grains', sub: 'Beans', img: 'https://static.vecteezy.com/system/resources/previews/005/930/322/large_2x/collage-various-beans-mix-peas-agriculture-of-natural-healthy-food-for-cooking-ingredients-set-of-different-whole-grains-beans-and-legumes-seeds-lentils-and-nuts-colorful-snack-texture-background-free-photo.JPG' }
+      ]
+    },
+    'Flours': {
+      icon: <Package size={16} />,
+      items: [
+        { name: 'Wheat Atta', sub: 'Wheat', img: 'https://images.unsplash.com/photo-1574323347407-f5e1ad6d020b?auto=format&fit=crop&q=80&w=200' },
+        { name: 'Besan & Others', sub: 'Other Flours', img: 'https://static.toiimg.com/photo/70364232.cms' }
+      ]
+    },
+    'Sugar': {
+      icon: <Coffee size={16} />,
+      items: [
+        { name: 'Natural Jaggery', sub: 'Jaggery', img: 'https://5.imimg.com/data5/SELLER/Default/2023/8/339365834/ST/ST/IF/48557502/organic-brown-sugar-jaggery-500x500.jpg' },
+        { name: 'Refined Sugar', sub: 'White Sugar', img: 'https://tiimg.tistatic.com/fp/1/008/606/white-refined-sugar-559.jpg' }
+      ]
+    }
+  };
+
+  // ... (rest of suggestions and handlers)
 
   const suggestions = localSearchQuery.trim() === '' ? [] : allProducts.filter(p => p.name.toLowerCase().includes(localSearchQuery.toLowerCase())).slice(0, 5);
 
@@ -25,7 +59,7 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, onLoginClick,
   };
 
   return (
-    <div className="bg-white/60 backdrop-blur-md sticky top-0 z-50 border-b border-gray-100 h-[72px] flex flex-col justify-center">
+    <div className="bg-white/60 backdrop-blur-md fixed top-0 left-0 w-full z-50 border-b border-gray-100 h-[72px] flex flex-col justify-center">
       <nav className="container mx-auto px-6 flex items-center justify-between relative h-full">
         {/* Left: Logo */}
         <div className="flex items-center cursor-pointer flex-shrink-0" onClick={() => onNavigate('home')}>
@@ -39,42 +73,59 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, onLoginClick,
               <button onClick={() => onNavigate('home')} className={`pb-1 transition-colors ${currentPage === 'home' ? 'border-b-2 border-emerald-600 text-emerald-700' : 'hover:text-emerald-600 border-b-2 border-transparent'}`}>Home</button>
               <button onClick={() => onNavigate('products')} className={`pb-1 transition-colors ${currentPage === 'products' ? 'border-b-2 border-emerald-600 text-emerald-700' : 'hover:text-emerald-600 border-b-2 border-transparent'}`}>Products</button>
               
-              <div className="relative group cursor-pointer flex items-center">
+              <div className="relative group cursor-pointer h-[72px] flex items-center">
                 <button className="flex items-center gap-1 hover:text-emerald-600 transition-colors pb-1 border-b-2 border-transparent">
                   Categories <ChevronDown size={14} className="mt-0.5 text-gray-500 group-hover:text-emerald-600 transition-colors" />
                 </button>
-                <div className="absolute top-full -left-4 pt-2 w-56 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 z-50">
-                  <div className="bg-white text-gray-800 rounded-xl shadow-xl overflow-hidden border border-gray-100 transform origin-top-left group-hover:translate-y-0 translate-y-2 transition-all duration-300">
-                    <a href="#" className="flex items-center gap-3 px-5 py-3 hover:bg-emerald-50 hover:text-emerald-700 font-medium border-b border-gray-50 transition-colors group/item">
-                      <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center group-hover/item:bg-emerald-200 transition-colors">
-                        <Wheat size={14} className="text-emerald-600" />
-                      </div>
-                      Rice
-                    </a>
-                    <a href="#" className="flex items-center gap-3 px-5 py-3 hover:bg-emerald-50 hover:text-emerald-700 font-medium border-b border-gray-50 transition-colors group/item">
-                      <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center group-hover/item:bg-emerald-200 transition-colors">
-                        <Leaf size={14} className="text-emerald-600" />
-                      </div>
-                      Pulses
-                    </a>
-                    <a href="#" className="flex items-center gap-3 px-5 py-3 hover:bg-emerald-50 hover:text-emerald-700 font-medium border-b border-gray-50 transition-colors group/item">
-                      <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center group-hover/item:bg-emerald-200 transition-colors">
-                        <ShoppingBag size={14} className="text-emerald-600" />
-                      </div>
-                      BTC
-                    </a>
-                    <a href="#" className="flex items-center gap-3 px-5 py-3 hover:bg-emerald-50 hover:text-emerald-700 font-medium border-b border-gray-50 transition-colors group/item">
-                      <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center group-hover/item:bg-emerald-200 transition-colors">
-                        <Package size={14} className="text-emerald-600" />
-                      </div>
-                      Flours & Sooji
-                    </a>
-                    <a href="#" className="flex items-center gap-3 px-5 py-3 hover:bg-emerald-50 hover:text-emerald-700 font-medium transition-colors group/item">
-                      <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center group-hover/item:bg-emerald-200 transition-colors">
-                        <Coffee size={14} className="text-emerald-600" />
-                      </div>
-                      Sugar & Jaggery
-                    </a>
+                <div className="absolute top-full -left-20 pt-0 w-[640px] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 z-50">
+                  <div className="bg-white text-gray-800 rounded-b-3xl shadow-2xl overflow-hidden border-t border-emerald-500 flex h-[340px] transform origin-top group-hover:scale-y-100 scale-y-95 transition-transform duration-300">
+                    
+                    {/* Left Sidebar - Categories */}
+                    <div className="w-56 bg-gray-50/50 border-r border-gray-100 p-4 space-y-1">
+                      {Object.keys(megaData).map(cat => (
+                        <button 
+                          key={cat}
+                          onMouseEnter={() => setActiveMegaCategory(cat)}
+                          onClick={() => onCategoryClick(cat)}
+                          className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-200 group/item ${activeMegaCategory === cat ? 'bg-white shadow-md text-emerald-700 ring-1 ring-gray-100' : 'text-gray-500 hover:bg-gray-100/50 hover:text-gray-900'}`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className={`${activeMegaCategory === cat ? 'text-emerald-600' : 'text-gray-400'}`}>
+                              {megaData[cat].icon}
+                            </span>
+                            <span className="text-xs font-black uppercase tracking-wider">{cat}</span>
+                          </div>
+                          <ChevronDown size={14} className={`-rotate-90 transition-transform ${activeMegaCategory === cat ? 'translate-x-0' : '-translate-x-2 opacity-0'}`} />
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Right Content Area - Subcategories */}
+                    <div className="flex-grow p-8 bg-white overflow-y-auto">
+                       <div className="flex items-center justify-between mb-6">
+                         <h3 className="text-sm font-black text-gray-900 uppercase tracking-widest flex items-center gap-2">
+                           {activeMegaCategory} <span className="text-emerald-600">Collections</span>
+                         </h3>
+                         <button onClick={() => onCategoryClick(activeMegaCategory)} className="text-[10px] font-black text-emerald-600 uppercase hover:underline tracking-tighter">View All &rarr;</button>
+                       </div>
+
+                       <div className="grid grid-cols-2 gap-4">
+                         {megaData[activeMegaCategory].items.map(item => (
+                           <button 
+                             key={item.name}
+                             onClick={() => onCategoryClick(activeMegaCategory, item.sub)}
+                             className="group/card flex flex-col gap-3 p-3 rounded-2xl hover:bg-emerald-50/50 transition-all border border-transparent hover:border-emerald-100"
+                           >
+                             <div className="w-full h-24 rounded-xl overflow-hidden relative">
+                               <img src={item.img} alt={item.name} className="w-full h-full object-cover transform group-hover/card:scale-110 transition-transform duration-500" />
+                               <div className="absolute inset-0 bg-emerald-900/10 group-hover/card:bg-transparent transition-colors"></div>
+                             </div>
+                             <span className="text-xs font-bold text-gray-700 group-hover/card:text-emerald-700 transition-colors">{item.name}</span>
+                           </button>
+                         ))}
+                       </div>
+                    </div>
+
                   </div>
                 </div>
               </div>
@@ -155,9 +206,24 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, onLoginClick,
             )}
           </button>
           
-          <button onClick={onLoginClick} className="hidden sm:block px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full text-sm font-extrabold transition-all duration-300 shadow-lg shadow-emerald-600/30 transform hover:-translate-y-0.5">
-            Sign Up
-          </button>
+          {isB2B ? (
+            <div className="hidden sm:flex items-center gap-3">
+              <div className="flex flex-col items-end">
+                <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest leading-none mb-1">Business Mode</span>
+                <span className="text-[11px] font-bold text-gray-500">Unlocked 25% Off</span>
+              </div>
+              <button 
+                onClick={onLogout}
+                className="px-5 py-2 bg-gray-900 hover:bg-black text-white rounded-full text-xs font-black transition-all duration-300 shadow-lg shadow-gray-900/20"
+              >
+                Logout
+              </button>
+            </div>
+          ) : (
+            <button onClick={onLoginClick} className="hidden sm:block px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full text-sm font-extrabold transition-all duration-300 shadow-lg shadow-emerald-600/30 transform hover:-translate-y-0.5">
+              Sign Up
+            </button>
+          )}
           
           <button className="lg:hidden h-10 w-10 rounded-full bg-emerald-50 flex items-center justify-center hover:bg-emerald-100 transition-all border border-emerald-100" onClick={() => setIsMenuOpen(!isMenuOpen)}>
             <Menu size={20} className="text-emerald-700" />
@@ -221,21 +287,18 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, onLoginClick,
           <div className="pb-2 border-b border-gray-100">
             <span className="font-bold block mb-2 text-gray-800">Categories</span>
             <div className="pl-4 flex flex-col gap-3 font-medium">
-               <a href="#" className="flex items-center gap-2 text-gray-600 hover:text-emerald-600 transition-colors">
+               <button onClick={() => { onCategoryClick('Rice'); setIsMenuOpen(false); }} className="flex items-center gap-2 text-gray-600 hover:text-emerald-600 transition-colors text-left">
                  <Wheat size={14} className="text-emerald-600" /> Rice
-               </a>
-               <a href="#" className="flex items-center gap-2 text-gray-600 hover:text-emerald-600 transition-colors">
+               </button>
+               <button onClick={() => { onCategoryClick('Pulses'); setIsMenuOpen(false); }} className="flex items-center gap-2 text-gray-600 hover:text-emerald-600 transition-colors text-left">
                  <Leaf size={14} className="text-emerald-600" /> Pulses
-               </a>
-               <a href="#" className="flex items-center gap-2 text-gray-600 hover:text-emerald-600 transition-colors">
-                 <ShoppingBag size={14} className="text-emerald-600" /> BTC
-               </a>
-               <a href="#" className="flex items-center gap-2 text-gray-600 hover:text-emerald-600 transition-colors">
+               </button>
+               <button onClick={() => { onCategoryClick('Flours'); setIsMenuOpen(false); }} className="flex items-center gap-2 text-gray-600 hover:text-emerald-600 transition-colors text-left">
                  <Package size={14} className="text-emerald-600" /> Flours & Sooji
-               </a>
-               <a href="#" className="flex items-center gap-2 text-gray-600 hover:text-emerald-600 transition-colors">
+               </button>
+               <button onClick={() => { onCategoryClick('Sugar'); setIsMenuOpen(false); }} className="flex items-center gap-2 text-gray-600 hover:text-emerald-600 transition-colors text-left">
                  <Coffee size={14} className="text-emerald-600" /> Sugar & Jaggery
-               </a>
+               </button>
             </div>
           </div>
           <button onClick={() => { onNavigate('contact'); setIsMenuOpen(false); }} className={`text-left font-bold pb-2 transition-colors ${currentPage === 'contact' ? 'text-emerald-600' : 'hover:text-emerald-600'}`}>Contact Us</button>
