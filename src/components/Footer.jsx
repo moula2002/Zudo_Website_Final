@@ -44,46 +44,33 @@ export default function Footer({ onNavigate }) {
           <div>
             <h3 className="text-gray-900 font-bold text-lg mb-6">Quick Links</h3>
             <ul className="space-y-3">
-              <li><a href="#" className="hover:text-green-600 transition-colors">About Us</a></li>
-              <li><a href="#" onClick={(e) => { e.preventDefault(); onNavigate && onNavigate('contact'); }} className="hover:text-green-600 transition-colors">Contact Us</a></li>
-              <li><a href="#" className="hover:text-green-600 transition-colors">Our Services</a></li>
-              <li><a href="#" onClick={(e) => { e.preventDefault(); onNavigate && onNavigate('products'); }} className="hover:text-green-600 transition-colors">Shop by Category</a></li>
-              <li><a href="#" className="hover:text-green-600 transition-colors">Track Your Order</a></li>
-              <li><a href="#" className="hover:text-green-600 transition-colors">Terms & Conditions</a></li>
+              <li><button onClick={() => onNavigate('home')} className="hover:text-green-600 transition-colors">Home</button></li>
+              <li><button onClick={() => onNavigate('products')} className="hover:text-green-600 transition-colors">Products</button></li>
+              <li><button onClick={() => onNavigate('contact')} className="hover:text-green-600 transition-colors">Contact Us</button></li>
+              <li><button onClick={() => onNavigate('wishlist')} className="hover:text-green-600 transition-colors">Wishlist</button></li>
+              <li><button onClick={() => onNavigate('cart')} className="hover:text-green-600 transition-colors">Shopping Cart</button></li>
             </ul>
           </div>
 
-          {/* Categories */}
+          {/* Support */}
           <div>
-            <h3 className="text-gray-900 font-bold text-lg mb-6">Categories</h3>
+            <h3 className="text-gray-900 font-bold text-lg mb-6">Support</h3>
             <ul className="space-y-3">
-              <li><a href="#" className="hover:text-green-600 transition-colors">Premium Rice</a></li>
-              <li><a href="#" className="hover:text-green-600 transition-colors">Organic Pulses</a></li>
-              <li><a href="#" className="hover:text-green-600 transition-colors">Flours & Sooji</a></li>
-              <li><a href="#" className="hover:text-green-600 transition-colors">Sugar & Jaggery</a></li>
-              <li><a href="#" className="hover:text-green-600 transition-colors">BTC Essentials</a></li>
+              <li><a href="#" className="hover:text-green-600 transition-colors">Terms & Conditions</a></li>
+              <li><a href="#" className="hover:text-green-600 transition-colors">FAQ</a></li>
+              <li><a href="#" className="hover:text-green-600 transition-colors">Privacy Policy</a></li>
+              <li><a href="#" className="hover:text-green-600 transition-colors">Returns & Refunds</a></li>
+              <li><a href="#" className="hover:text-green-600 transition-colors">Shipping Policy</a></li>
             </ul>
           </div>
 
-          {/* Newsletter */}
+          {/* Contact Details */}
           <div>
-            <h3 className="text-gray-900 font-bold text-lg mb-6">Newsletter</h3>
-            <p className="text-sm mb-4">Subscribe to get updates on our latest offers and fresh arrivals.</p>
-            <div className="flex items-center mb-6">
-              <input 
-                type="email" 
-                placeholder="Your email address" 
-                className="w-full bg-white border border-gray-300 rounded-l-lg px-4 py-2.5 focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 text-sm"
-              />
-              <button className="bg-green-600 hover:bg-green-700 text-white px-4 py-2.5 rounded-r-lg transition-colors border border-green-600">
-                <Send size={18} />
-              </button>
-            </div>
-            <div className="space-y-3 text-sm">
+            <h3 className="text-gray-900 font-bold text-lg mb-6">Contact Us</h3>
+            <div className="space-y-4 text-sm">
               <div className="flex items-start gap-3">
                 <MapPin size={18} className="text-green-600 shrink-0 mt-0.5" />
-                <span>Bharath nagar, 2nd stage, magadi main road, bangaluru,560091
-</span>
+                <span>Bharath nagar, 2nd stage, magadi main road, bangaluru, 560091</span>
               </div>
               <div className="flex items-center gap-3">
                 <Phone size={18} className="text-green-600 shrink-0" />
@@ -101,10 +88,16 @@ export default function Footer({ onNavigate }) {
         {/* Bottom Bar */}
         <div className="border-t border-gray-200 pt-8 flex flex-col md:flex-row items-center justify-between gap-4 text-sm">
           <p>&copy; {new Date().getFullYear()} Zudo. All rights reserved.</p>
-          <div className="flex gap-4">
-            <a href="#" className="hover:text-green-600 transition-colors">Privacy Policy</a>
-            <a href="#" className="hover:text-green-600 transition-colors">Terms of Service</a>
-            <a href="#" className="hover:text-green-600 transition-colors">Returns</a>
+          <div className="flex gap-1 items-center">
+            <span>Developed by</span>
+            <a 
+              href="https://www.innomatricstech.com/" 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="font-bold text-gray-900 hover:text-green-600 transition-colors"
+            >
+              Innomatrics Tech
+            </a>
           </div>
         </div>
       </div>

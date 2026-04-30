@@ -1,10 +1,10 @@
 import React from 'react';
-import { Trash2, ArrowLeft, ShoppingBag } from 'lucide-react';
+import { Trash2, ArrowLeft, ShoppingBag, CreditCard, ChevronRight } from 'lucide-react';
 
 export default function CartPage({ cartItems, onUpdateQuantity, onRemove, onNavigate }) {
   const subtotal = cartItems.reduce((acc, item) => {
-    // Parse price string '₹140/kg' -> 140
-    const price = parseInt(item.price.replace(/\D/g, ''));
+    const priceStr = String(item.price);
+    const price = parseInt(priceStr.replace(/\D/g, '')) || 0;
     return acc + (price * item.quantity);
   }, 0);
 
@@ -13,101 +13,142 @@ export default function CartPage({ cartItems, onUpdateQuantity, onRemove, onNavi
 
   if (cartItems.length === 0) {
     return (
-      <div className="container mx-auto px-6 py-20 flex flex-col items-center justify-center min-h-[60vh]">
-        <div className="w-40 h-40 bg-emerald-50 rounded-full flex items-center justify-center mb-6">
-          <ShoppingBag size={64} className="text-emerald-500" />
+      <div className="container mx-auto px-6 py-20 flex flex-col items-center justify-center min-h-[70vh]">
+        <div className="w-48 h-48 bg-emerald-50 rounded-full flex items-center justify-center mb-8 relative">
+          <div className="absolute inset-0 bg-emerald-100 rounded-full animate-ping opacity-20"></div>
+          <ShoppingBag size={80} className="text-emerald-200 relative z-10" />
         </div>
-        <h2 className="text-3xl font-extrabold text-gray-900 mb-2">Your cart is empty</h2>
-        <p className="text-gray-500 mb-8 font-medium">Looks like you haven't added anything to your cart yet.</p>
+        <h2 className="text-4xl font-black text-gray-900 mb-4 tracking-tight">Your cart is empty</h2>
+        <p className="text-gray-500 mb-10 font-bold max-w-sm text-center leading-relaxed">Ready to fill your kitchen with the freshest ingredients? Let's start shopping!</p>
         <button 
           onClick={() => onNavigate('home')}
-          className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-8 rounded-full shadow-lg shadow-emerald-600/30 transition-all transform hover:-translate-y-1"
+          className="bg-emerald-600 hover:bg-emerald-700 text-white font-black py-4 px-12 rounded-2xl shadow-2xl shadow-emerald-600/30 transition-all transform hover:-translate-y-1 hover:scale-105 active:scale-95"
         >
-          Start Shopping
+          Explore Store
         </button>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto px-6 py-12 min-h-screen">
-      <button 
-        onClick={() => onNavigate('home')}
-        className="flex items-center gap-2 text-gray-500 hover:text-emerald-600 font-medium mb-8 transition-colors"
-      >
-        <ArrowLeft size={20} /> Continue Shopping
-      </button>
-
-      <h1 className="text-3xl md:text-4xl font-extrabold text-gray-900 mb-10">Shopping Cart</h1>
-
-      <div className="flex flex-col lg:flex-row gap-10">
-        {/* Cart Items List */}
-        <div className="w-full lg:w-2/3">
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-            {cartItems.map(item => (
-              <div key={item.id} className="flex items-center gap-4 p-6 border-b border-gray-50 last:border-0 hover:bg-gray-50/50 transition-colors">
-                <div className="w-24 h-24 bg-gray-100 rounded-xl overflow-hidden flex-shrink-0">
-                  {item.image && <img src={item.image} alt={item.name} className="w-full h-full object-cover" />}
-                </div>
-                
-                <div className="flex-grow">
-                  <h3 className="text-lg font-bold text-gray-900 mb-1">{item.name}</h3>
-                  <div className="text-emerald-600 font-extrabold">{item.price}</div>
-                </div>
-
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center bg-gray-100 rounded-full p-1">
-                    <button onClick={() => onUpdateQuantity(item.id, -1)} className="w-8 h-8 rounded-full bg-white text-gray-700 font-bold shadow-sm hover:bg-gray-50 transition-colors">-</button>
-                    <span className="w-10 text-center font-bold text-gray-900">{item.quantity}</span>
-                    <button onClick={() => onUpdateQuantity(item.id, 1)} className="w-8 h-8 rounded-full bg-white text-gray-700 font-bold shadow-sm hover:bg-gray-50 transition-colors">+</button>
-                  </div>
-                  
-                  <button onClick={() => onRemove(item.id)} className="w-10 h-10 rounded-full bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-500 hover:text-white transition-colors">
-                    <Trash2 size={18} />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
+    <div className="bg-[#fcfdfd] min-h-screen pb-24">
+      {/* Page Header Area */}
+      <div className="bg-emerald-600 pt-20 pb-24 px-6 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
+        <div className="max-w-6xl mx-auto relative z-10">
+          <button 
+            onClick={() => onNavigate('home')}
+            className="flex items-center gap-2 text-emerald-100 hover:text-white font-black text-xs uppercase tracking-widest mb-6 transition-all group"
+          >
+            <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" /> 
+            Back to Store
+          </button>
+          <h1 className="text-4xl md:text-5xl font-black text-white tracking-tight">Shopping Cart</h1>
+          <p className="text-emerald-100/70 font-bold mt-2">You have {cartItems.length} items in your basket</p>
         </div>
+      </div>
 
-        {/* Order Summary */}
-        <div className="w-full lg:w-1/3">
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sticky top-32">
-            <h2 className="text-xl font-extrabold text-gray-900 mb-6">Order Summary</h2>
-            
-            <div className="space-y-4 mb-6">
-              <div className="flex justify-between text-gray-600 font-medium">
-                <span>Subtotal ({cartItems.length} items)</span>
-                <span>₹{subtotal}</span>
+      <div className="max-w-6xl mx-auto px-6 -mt-10 relative z-20">
+        <div className="flex flex-col lg:flex-row gap-8">
+          {/* Cart Items List */}
+          <div className="w-full lg:w-2/3">
+            <div className="bg-white rounded-[2rem] shadow-xl shadow-emerald-900/5 border border-gray-100 overflow-hidden">
+              <div className="p-8 border-b border-gray-50 flex items-center justify-between">
+                <h3 className="text-xl font-black text-gray-900">Items Summary</h3>
+                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest bg-gray-50 px-3 py-1 rounded-full">{cartItems.length} Products</span>
               </div>
-              <div className="flex justify-between text-gray-600 font-medium">
-                <span>Delivery Fee</span>
-                <span>{deliveryFee === 0 ? <span className="text-emerald-600 font-bold">Free</span> : `₹${deliveryFee}`}</span>
+              
+              <div className="divide-y divide-gray-50">
+                {cartItems.map(item => (
+                  <div key={item.id} className="flex flex-col sm:flex-row sm:items-center gap-6 p-8 hover:bg-emerald-50/10 transition-all group">
+                    <div className="w-24 h-24 bg-gray-50 rounded-2xl overflow-hidden flex-shrink-0 border border-gray-100 group-hover:scale-105 transition-transform duration-500">
+                      {item.image && <img src={item.image} alt={item.name} className="w-full h-full object-cover" />}
+                    </div>
+                    
+                    <div className="flex-grow">
+                      <h3 className="text-lg font-black text-gray-900 mb-1 leading-tight">{item.name}</h3>
+                      <div className="text-emerald-600 font-black text-xl tracking-tighter">{item.price}</div>
+                    </div>
+
+                    <div className="flex items-center justify-between sm:justify-end gap-6">
+                      <div className="flex items-center bg-gray-50 rounded-2xl p-1.5 border border-gray-100 shadow-inner">
+                        <button 
+                          onClick={() => onUpdateQuantity(item.id, -1)} 
+                          className="w-10 h-10 rounded-xl bg-white text-gray-900 font-black shadow-sm hover:bg-emerald-600 hover:text-white transition-all active:scale-90"
+                        >
+                          -
+                        </button>
+                        <span className="w-12 text-center font-black text-gray-900 text-lg">{item.quantity}</span>
+                        <button 
+                          onClick={() => onUpdateQuantity(item.id, 1)} 
+                          className="w-10 h-10 rounded-xl bg-white text-gray-900 font-black shadow-sm hover:bg-emerald-600 hover:text-white transition-all active:scale-90"
+                        >
+                          +
+                        </button>
+                      </div>
+                      
+                      <button 
+                        onClick={() => onRemove(item.id)} 
+                        className="w-12 h-12 rounded-2xl bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all shadow-sm hover:shadow-red-500/20 active:scale-90"
+                      >
+                        <Trash2 size={20} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
-              {subtotal < 500 && (
-                <div className="text-xs text-emerald-500 bg-emerald-50 p-2 rounded-lg">
-                  Add ₹{500 - subtotal} more to get Free Delivery!
+            </div>
+          </div>
+
+          {/* Order Summary */}
+          <div className="w-full lg:w-1/3">
+            <div className="bg-white rounded-[2rem] shadow-2xl shadow-emerald-900/10 border border-gray-100 p-8 sticky top-32">
+              <div className="flex items-center gap-3 mb-8">
+                <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-600 shadow-inner">
+                  <CreditCard size={20} />
                 </div>
-              )}
-            </div>
-
-            <div className="border-t border-gray-100 pt-4 mb-8">
-              <div className="flex justify-between items-center">
-                <span className="text-lg font-bold text-gray-900">Total</span>
-                <span className="text-3xl font-extrabold text-emerald-600">₹{total}</span>
+                <h2 className="text-2xl font-black text-gray-900 tracking-tight">Order Summary</h2>
               </div>
-              <p className="text-xs text-gray-400 mt-1 text-right">Inclusive of all taxes</p>
-            </div>
+              
+              <div className="space-y-5 mb-8">
+                <div className="flex justify-between text-gray-500 font-bold">
+                  <span className="text-sm">Subtotal ({cartItems.length} items)</span>
+                  <span className="text-gray-900 font-black">₹{subtotal}</span>
+                </div>
+                <div className="flex justify-between text-gray-500 font-bold">
+                  <span className="text-sm">Delivery Fee</span>
+                  <span className="text-gray-900">
+                    {deliveryFee === 0 ? <span className="text-emerald-600 font-black uppercase text-xs tracking-widest">Free</span> : `₹${deliveryFee}`}
+                  </span>
+                </div>
+                {subtotal < 500 && (
+                  <div className="text-[10px] font-black text-emerald-700 bg-emerald-50/50 p-4 rounded-2xl border border-emerald-100 text-center uppercase tracking-widest">
+                    Add ₹{500 - subtotal} more for Free Delivery!
+                  </div>
+                )}
+              </div>
 
-            <button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-4 rounded-xl shadow-lg shadow-emerald-600/30 transform hover:-translate-y-1 transition-all">
-              Proceed to Checkout
-            </button>
+              <div className="border-t-2 border-dashed border-gray-100 pt-6 mb-10">
+                <div className="flex justify-between items-end">
+                  <span className="text-lg font-black text-gray-900">Total Bill</span>
+                  <div className="text-right">
+                    <span className="text-4xl font-black text-emerald-600 tracking-tighter">₹{total}</span>
+                    <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mt-1">Inc. all taxes</p>
+                  </div>
+                </div>
+              </div>
+
+              <button 
+                onClick={() => onNavigate('checkout')}
+                className="w-full bg-[#107569] hover:bg-[#0d6359] text-white font-black py-5 rounded-2xl shadow-2xl shadow-emerald-900/20 transform hover:-translate-y-1 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3 group"
+              >
+                Proceed to Checkout
+                <ChevronRight size={20} className="group-hover:translate-x-1 transition-transform" />
+              </button>
+            </div>
           </div>
         </div>
       </div>
     </div>
   );
 }
-
-

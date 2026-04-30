@@ -3,13 +3,13 @@ import { Heart, Plus, Minus, Star } from 'lucide-react';
 
 export default function ProductCard({ product, onAddToCart, onUpdateQuantity, onToggleWishlist, isWishlisted, quantity = 0 }) {
   return (
-    <div className="bg-white rounded-[2.5rem] p-3 transition-all duration-500 group relative border border-gray-100 hover:border-emerald-200 hover:shadow-[0_30px_60px_-15px_rgba(6,78,59,0.12)] flex flex-col h-full transform hover:-translate-y-2">
+    <div className="bg-white rounded-3xl p-2 transition-all duration-500 group relative border border-gray-100 hover:border-gray-900-200 hover:shadow-[0_40px_80px_-20px_rgba(17,24,39,0.15)] flex flex-col h-full transform hover:-translate-y-2 max-w-[280px] mx-auto w-full shadow-sm">
       
       {/* Top Image Section */}
-      <div className="w-full h-64 bg-[#fdfdfd] rounded-[2rem] overflow-hidden relative transition-all duration-500">
+      <div className="w-full h-52 bg-[#fdfdfd] rounded-2xl overflow-hidden relative transition-all duration-500">
         {product.badge && (
           <div className="absolute top-4 left-4 z-10 flex flex-col gap-2">
-            <span className="bg-[#107569] text-white text-[10px] font-black px-3 py-1.5 rounded-full shadow-lg shadow-[#107569]/20 uppercase tracking-widest animate-pulse">
+            <span className="bg-black text-white text-[10px] font-black px-3 py-1.5 rounded-full shadow-lg shadow-gray-900-600/20 uppercase tracking-widest animate-pulse">
               {product.badge}
             </span>
           </div>
@@ -17,14 +17,14 @@ export default function ProductCard({ product, onAddToCart, onUpdateQuantity, on
         
         <button 
           onClick={(e) => { e.stopPropagation(); onToggleWishlist && onToggleWishlist(product); }}
-          className={`absolute top-4 right-4 z-10 p-2.5 rounded-full shadow-xl backdrop-blur-xl transition-all duration-300 transform hover:scale-110 active:scale-95 ${isWishlisted ? 'bg-red-500 text-white shadow-red-500/30' : 'bg-white/90 text-gray-400 hover:text-red-500 hover:bg-white'}`}
+          className={`absolute top-4 right-4 z-10 p-2.5 rounded-full shadow-xl backdrop-blur-xl transition-all duration-300 transform hover:scale-110 active:scale-95 ${isWishlisted ? 'bg-amber-500 text-white shadow-amber-500/30' : 'bg-white/90 text-gray-400 hover:text-amber-500 hover:bg-white'}`}
         >
           <Heart size={18} className={isWishlisted ? "fill-white" : ""} />
         </button>
         
-        {product.image ? (
+        { (product.image || product.imageUrl) ? (
           <img 
-            src={product.image} 
+            src={product.image || product.imageUrl} 
             alt={product.name} 
             className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-1000 ease-out"
           />
@@ -39,10 +39,12 @@ export default function ProductCard({ product, onAddToCart, onUpdateQuantity, on
           <div className="bg-white/90 backdrop-blur-md rounded-2xl p-3 shadow-2xl flex items-center justify-between border border-white/20">
              <div className="flex flex-col">
                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tight">Price per unit</span>
-               <span className="text-sm font-black text-[#107569]">{product.price}</span>
+               <span className="text-sm font-black text-gray-900-600">
+                 {typeof product.price === 'number' ? `₹${product.price}` : (product.price?.startsWith('₹') ? product.price : `₹${product.price}`)}
+               </span>
              </div>
              {quantity > 0 ? (
-               <div className="flex items-center gap-1.5 bg-[#107569] rounded-lg p-0.5 shadow-lg shadow-[#107569]/30">
+               <div className="flex items-center gap-1.5 bg-black rounded-lg p-0.5 shadow-lg shadow-gray-900-600/30">
                  <button 
                    onClick={(e) => { e.stopPropagation(); onUpdateQuantity && onUpdateQuantity(product.id, -1); }}
                    className="w-6 h-6 rounded-md flex items-center justify-center text-white hover:bg-white/20 transition-colors"
@@ -60,7 +62,7 @@ export default function ProductCard({ product, onAddToCart, onUpdateQuantity, on
              ) : (
                <button 
                  onClick={(e) => { e.stopPropagation(); onAddToCart && onAddToCart(product); }}
-                 className="bg-[#107569] text-white w-8 h-8 rounded-xl flex items-center justify-center hover:bg-[#0d6359] transition-colors shadow-lg shadow-[#107569]/30"
+                 className="bg-black text-white w-8 h-8 rounded-xl flex items-center justify-center hover:bg-gray-900-700 transition-colors shadow-lg shadow-gray-900-600/30"
                >
                  <Plus size={18} strokeWidth={3} />
                </button>
@@ -75,9 +77,9 @@ export default function ProductCard({ product, onAddToCart, onUpdateQuantity, on
       {/* Content Section */}
       <div className="flex-grow px-4 pt-3 pb-1 flex flex-col">
         <div className="flex items-center flex-wrap gap-2 mb-3">
-          <span className="bg-[#107569]/5 text-[#107569] text-[10px] font-black px-2.5 py-1 rounded-lg uppercase tracking-wider">{product.category || 'Grocery'}</span>
+          <span className="bg-gray-900-50 text-gray-900-600 text-[10px] font-black px-2.5 py-1 rounded-lg uppercase tracking-wider">{product.category || 'Grocery'}</span>
           {product.subcategory && (
-            <span className="bg-emerald-100/30 text-emerald-600 text-[9px] font-bold px-2 py-0.5 rounded-md border border-emerald-100 tracking-wide">
+            <span className="bg-amber-50 text-amber-500 text-[9px] font-bold px-2 py-0.5 rounded-md border border-amber-100 tracking-wide">
               {product.subcategory}
             </span>
           )}
@@ -87,28 +89,30 @@ export default function ProductCard({ product, onAddToCart, onUpdateQuantity, on
           </div>
         </div>
         
-        <h3 className="text-gray-900 font-black leading-tight group-hover:text-[#107569] transition-colors line-clamp-2 min-h-[2.5rem]">
+        <h3 className="text-gray-900 font-black leading-tight group-hover:text-gray-900-600 transition-colors line-clamp-2 min-h-[2.5rem]">
           {product.name}
         </h3>
         
         <div className="mt-1 pt-3 border-t border-gray-50 flex items-center justify-between">
           <div className="flex flex-col">
             {product.oldPrice && (
-              <span className="text-gray-400 text-[11px] line-through font-bold mb-0.5 tracking-tight">{product.oldPrice}</span>
+              <span className="text-gray-400 text-[11px] line-through font-bold mb-0.5 tracking-tight">₹{product.oldPrice}</span>
             )}
             <div className="flex items-baseline gap-1.5">
-              <span className="text-[#107569] font-black text-xl tracking-tighter">{product.price}</span>
+              <span className="text-gray-900-600 font-black text-xl tracking-tighter">
+                {typeof product.price === 'number' ? `₹${product.price}` : (product.price?.startsWith('₹') ? product.price : `₹${product.price}`)}
+              </span>
               {product.isB2B && (
                 <div className="flex items-center gap-1.5 mt-1">
                   <span className="text-[8px] font-black bg-gray-900 text-white px-1.5 py-0.5 rounded uppercase tracking-tighter">B2B</span>
-                  <span className="text-[8px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100 uppercase tracking-tighter">Min Qty: 4</span>
+                  <span className="text-[8px] font-bold text-gray-900-600 bg-gray-900-50 px-1.5 py-0.5 rounded border border-gray-900-100 uppercase tracking-tighter">Min Qty: 4</span>
                 </div>
               )}
             </div>
           </div>
           
           {quantity > 0 ? (
-            <div className="md:hidden flex items-center gap-3 bg-[#107569] rounded-2xl p-1 shadow-lg shadow-[#107569]/20">
+            <div className="md:hidden flex items-center gap-3 bg-black rounded-2xl p-1 shadow-lg shadow-gray-900-600/20">
               <button 
                 onClick={(e) => { e.stopPropagation(); onUpdateQuantity && onUpdateQuantity(product.id, -1); }}
                 className="w-7 h-7 rounded-xl flex items-center justify-center text-white hover:bg-white/20 transition-colors"
@@ -126,7 +130,7 @@ export default function ProductCard({ product, onAddToCart, onUpdateQuantity, on
           ) : (
             <button 
               onClick={(e) => { e.stopPropagation(); onAddToCart && onAddToCart(product); }}
-              className="md:hidden bg-[#107569] text-white w-8 h-8 rounded-2xl flex items-center justify-center transition-all duration-300 shadow-lg shadow-[#107569]/20 active:scale-90"
+              className="md:hidden bg-black text-white w-8 h-8 rounded-2xl flex items-center justify-center transition-all duration-300 shadow-lg shadow-gray-900-600/20 active:scale-90"
             >
               <Plus size={18} strokeWidth={3} />
             </button>

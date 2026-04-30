@@ -1,8 +1,6 @@
 import React from 'react';
 import ProductCard from './ProductCard';
-import { allProducts } from '../data';
-
-export default function HomeNeeds({ onAddToCart, onUpdateQuantity, onToggleWishlist, cartItems = [], wishlistItems = [], onNavigateToProduct, onNavigate, isB2B, getDisplayPrice }) {
+export default function HomeNeeds({ onAddToCart, onUpdateQuantity, onToggleWishlist, cartItems = [], wishlistItems = [], onNavigateToProduct, onNavigate, isB2B, getDisplayPrice, allProducts = [] }) {
   const homeNeeds = allProducts.slice(4, 8);
 
   return (

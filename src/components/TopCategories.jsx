@@ -1,64 +1,85 @@
 import React from 'react';
 
-const categories = [
-  { id: 1, name: 'Pulses & Dals', categoryKey: 'Pulses', count: '140+ items', image: 'https://static.toiimg.com/photo/82196489.cms' },
-  { id: 2, name: 'Premium Rice', categoryKey: 'Rice', count: '25+ items', image: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&q=80&w=500' },
-  { id: 3, name: 'Flours & Sooji', categoryKey: 'Flours', count: '45+ items', image: 'https://restaurantsupplier1.com/wp-content/uploads/2024/08/Sooji.jpg' },
-  { id: 4, name: 'Sugar & Jaggery', categoryKey: 'Sugar', count: '15+ items', image:'https://storables.com/wp-content/uploads/2023/09/how-to-store-palm-sugar-1695371267.jpg' },
-];
+const defaultImages = {
+  'Pulses': 'https://static.toiimg.com/photo/82196489.cms',
+  'Rice': 'https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&q=80&w=500',
+  'Flours': 'https://restaurantsupplier1.com/wp-content/uploads/2024/08/Sooji.jpg',
+  'Sugar': 'https://storables.com/wp-content/uploads/2023/09/how-to-store-palm-sugar-1695371267.jpg',
+  'Oil': 'https://images.unsplash.com/photo-1474979266404-7eaacbadcbaf?auto=format&fit=crop&q=80&w=500'
+};
 
-export default function TopCategories({ onNavigate, onCategoryClick }) {
-  return (
-    <section className="container mx-auto px-6 py-12 md:py-16">
-      <div className="flex flex-col md:flex-row justify-between items-end mb-8 gap-4">
-        <div>
-          <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900 mb-1.5">Shop by Category</h2>
-          <p className="text-gray-500 font-medium text-sm md:text-base">Explore our wide range of premium products</p>
+export default function TopCategories({ onNavigate, onCategoryClick, categories = [], loading }) {
+  const displayCategories = categories;
+
+  if (categories.length === 0 && !loading) {
+    return (
+      <section className="container mx-auto px-6 py-8 text-center">
+        <h2 className="text-xl font-black text-gray-900 mb-2 tracking-tighter">Collections</h2>
+        <p className="text-gray-400 font-bold uppercase tracking-widest text-[8px]">No categories found in backend</p>
+      </section>
+    );
+  }
+
+  if (loading && categories.length === 0) {
+    return (
+      <section className="container mx-auto px-6 py-12 text-center">
+        <div className="animate-pulse flex flex-col items-center">
+          <div className="h-6 w-32 bg-gray-100 rounded-full mb-8"></div>
+          <div className="flex gap-8 justify-center w-full overflow-hidden">
+            {[1, 2, 3, 4, 5, 6].map(i => (
+              <div key={i} className="flex flex-col items-center">
+                <div className="w-16 h-16 md:w-24 md:h-24 bg-gray-50 rounded-full mb-3"></div>
+                <div className="h-3 w-12 bg-gray-50 rounded-full"></div>
+              </div>
+            ))}
+          </div>
         </div>
-        <a href="#" onClick={(e) => { e.preventDefault(); onNavigate && onNavigate('products'); }} className="font-bold text-gray-900 border-b-2 border-black pb-0.5 text-sm md:text-base hover:text-gray-600 hover:border-gray-600 transition-colors">
-          Browse All Categories &rarr;
-        </a>
+      </section>
+    );
+  }
+
+  return (
+    <section className="container mx-auto px-6 py-10 md:py-12 bg-white">
+      <div className="flex items-center justify-between mb-10">
+        <div>
+          <h2 className="text-xl md:text-2xl font-black text-gray-900 tracking-tight">Shop by Category</h2>
+          <div className="h-1 w-12 bg-emerald-500 rounded-full mt-1"></div>
+        </div>
+        <button 
+          onClick={() => onNavigate && onNavigate('products')}
+          className="text-xs font-black text-emerald-600 uppercase tracking-widest hover:text-emerald-700 transition-colors"
+        >
+          View All &rarr;
+        </button>
       </div>
       
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 md:gap-5">
-        {categories.map((cat) => (
-          <div key={cat.id} onClick={() => onCategoryClick ? onCategoryClick(cat.categoryKey) : (onNavigate && onNavigate('products'))} className="group relative h-48 md:h-56 rounded-[2.5rem] overflow-hidden shadow-sm hover:shadow-[0_30px_60px_-15px_rgba(0,0,0,0.3)] transition-all duration-500 cursor-pointer transform hover:-translate-y-3">
-            {/* Background Image */}
-            <img 
-              src={cat.image} 
-              alt={cat.name} 
-              className="absolute inset-0 w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-[1.5s] ease-out"
-            />
-            {/* Glossy Gradient Overlay */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-60 group-hover:opacity-80 transition-opacity duration-500"></div>
+      <div className="flex gap-6 md:gap-10 overflow-x-auto pb-4 scrollbar-hide">
+        {displayCategories.map((cat) => (
+          <div 
+            key={cat._id || cat.id} 
+            onClick={() => onCategoryClick ? onCategoryClick(cat.name || cat.categoryKey) : (onNavigate && onNavigate('products'))} 
+            className="group flex flex-col items-center cursor-pointer flex-shrink-0"
+          >
+            <div className="relative w-16 h-16 md:w-28 md:h-28 mb-3 transition-all duration-500 transform group-hover:-translate-y-1">
+              {/* Outer Border */}
+              <div className="absolute inset-[-4px] border border-gray-100 rounded-full group-hover:border-emerald-500 group-hover:border-dashed transition-all duration-500"></div>
+              
+              {/* Main Circular Image */}
+              <div className="absolute inset-0 bg-white rounded-full border-2 border-white shadow-md overflow-hidden group-hover:shadow-xl group-hover:shadow-emerald-500/10 transition-all duration-500">
+                <img 
+                  src={cat.image || cat.imageUrl || defaultImages[cat.name] || 'https://images.unsplash.com/photo-1542831371-29b0f74f9713?auto=format&fit=crop&q=80&w=500'} 
+                  alt={cat.name} 
+                  className="w-full h-full object-cover transform group-hover:scale-110 transition-all duration-700 ease-out"
+                />
+              </div>
+            </div>
             
-            {/* Glass effect on hover */}
-            <div className="absolute inset-0 bg-emerald-600/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-
-            {/* Content */}
-            <div className="absolute bottom-0 left-0 w-full p-6 md:p-8 text-white z-10">
-              <div className="overflow-hidden">
-                <h3 className="font-black text-xl md:text-2xl mb-1 drop-shadow-2xl transform translate-y-0 group-hover:-translate-y-1 transition-transform duration-500">
-                  {cat.name}
-                </h3>
-              </div>
-              <div className="flex items-center gap-2 overflow-hidden">
-                <div className="h-[2px] w-0 bg-emerald-400 group-hover:w-8 transition-all duration-500"></div>
-                <p className="text-emerald-400 text-xs md:text-sm font-black uppercase tracking-[0.2em] opacity-0 group-hover:opacity-100 transform translate-x-2 group-hover:translate-x-0 transition-all duration-500 delay-100">
-                  {cat.count}
-                </p>
-              </div>
-            </div>
-
-            {/* Decorative element */}
-            <div className="absolute top-6 right-6 w-12 h-12 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transform scale-50 group-hover:scale-100 transition-all duration-500">
-               <span className="text-white text-xl">→</span>
-            </div>
+            <span className="font-bold text-gray-900 text-[10px] md:text-xs group-hover:text-emerald-600 transition-colors text-center whitespace-nowrap">
+              {cat.name}
+            </span>
           </div>
         ))}
       </div>
     </section>
   );
 }
-
-

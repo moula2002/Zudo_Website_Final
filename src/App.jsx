@@ -15,6 +15,9 @@ import ProductsPage from './components/ProductsPage';
 import ProductDetails from './components/ProductDetails';
 import ContactPage from './components/ContactPage';
 import B2BVerificationScreen from './components/B2BVerificationScreen';
+import CheckoutPage from './components/CheckoutPage';
+import ProfilePage from './components/ProfilePage';
+import OrdersPage from './components/OrdersPage';
 import './App.css';
 
 function App() {
@@ -26,6 +29,104 @@ function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState('All');
+  const [user, setUser] = useState(null);
+  const [allProducts, setAllProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [subcategories, setSubcategories] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // Initialize auth state
+  useEffect(() => {
+    const savedUser = localStorage.getItem('user');
+    if (savedUser) {
+      const parsedUser = JSON.parse(savedUser);
+      setUser(parsedUser);
+      
+      // Set initial B2B status based on saved user
+      if (parsedUser.role === 'business') {
+        if (parsedUser.isVerified) {
+          setB2bStatus('approved');
+          setIsB2B(true);
+        } else {
+          setB2bStatus('pending');
+          setIsB2B(false);
+        }
+      }
+    }
+
+    // Fetch initial data
+        const fetchInitialData = async () => {
+          try {
+            setLoading(true);
+            const apiBase = 'http://localhost:5001/api';
+            console.log('Fetching data from:', apiBase);
+            
+            const [prodRes, catRes, subRes] = await Promise.all([
+              fetch(`${apiBase}/products`),
+              fetch(`${apiBase}/categories`),
+              fetch(`${apiBase}/subcategories`)
+            ]);
+
+            if (!prodRes.ok) console.warn('Products fetch failed:', prodRes.status);
+            if (!catRes.ok) console.warn('Categories fetch failed:', catRes.status);
+            if (!subRes.ok) console.warn('Subcategories fetch failed:', subRes.status);
+
+            // Fetch latest user profile if token exists
+            const token = localStorage.getItem('token');
+            if (token) {
+              try {
+                const profileRes = await fetch(`${apiBase}/auth/profile`, {
+                  headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (profileRes.ok) {
+                  const latestUser = await profileRes.json();
+                  setUser(latestUser);
+                  localStorage.setItem('user', JSON.stringify(latestUser));
+                }
+              } catch (err) {
+                console.error('Failed to sync profile:', err);
+              }
+            }
+
+            const prodData = prodRes.ok ? await prodRes.json() : [];
+            const catData = catRes.ok ? await catRes.json() : [];
+            const subData = subRes.ok ? await subRes.json() : [];
+
+            // Map MongoDB _id to id for frontend compatibility and resolve category names
+            const mappedProducts = prodData.map(p => {
+              const cat = catData.find(c => c._id === (p.category || p.categoryId));
+              const sub = subData.find(s => s._id === (p.subcategory || p.subCategoryId));
+              
+              return {
+                ...p,
+                id: p._id,
+                image: p.imageUrl || p.image,
+                category: cat ? cat.name : (p.category?.name || p.category),
+                subcategory: sub ? sub.name : (p.subcategory?.name || p.subcategory)
+              };
+            });
+
+            const mappedSubs = subData.map(s => {
+              const catId = s.category?._id || s.category || s.categoryId;
+              return {
+                ...s,
+                image: s.imageUrl || s.image,
+                category: catId
+              };
+            });
+
+            setAllProducts(mappedProducts);
+            setCategories(catData);
+            setSubcategories(mappedSubs);
+          } catch (err) {
+            console.error('Failed to fetch initial data:', err);
+          } finally {
+            setLoading(false);
+          }
+        };
+
+    fetchInitialData();
+  }, []);
 
   const [selectedSubcategory, setSelectedSubcategory] = useState('All');
 
@@ -109,32 +210,67 @@ function App() {
 
   useEffect(() => {
     const handleB2BLogin = () => {
-      setB2bStatus('pending');
+      const savedUser = JSON.parse(localStorage.getItem('user'));
+      if (savedUser?.role === 'business' && !savedUser.isVerified) {
+        setB2bStatus('pending');
+        setIsB2B(false);
+        localStorage.removeItem('isB2B');
+      } else {
+        setB2bStatus('approved');
+        setIsB2B(true);
+        localStorage.setItem('isB2B', 'true');
+      }
     };
     window.addEventListener('b2b-login', handleB2BLogin);
     return () => window.removeEventListener('b2b-login', handleB2BLogin);
   }, []);
 
+  useEffect(() => {
+    if (user?.role === 'business') {
+      if (user.isVerified) {
+        setB2bStatus('approved');
+        setIsB2B(true);
+        localStorage.setItem('isB2B', 'true');
+      } else {
+        setB2bStatus('pending');
+        setIsB2B(false);
+        localStorage.removeItem('isB2B');
+      }
+    } else {
+      setB2bStatus('none');
+      setIsB2B(false);
+    }
+  }, [user]);
+
   const handleB2BApproval = () => {
+    // This is a local bypass for testing or if we had a socket/polling
     setB2bStatus('approved');
     setIsB2B(true);
-    showToast('B2B Account Approved! Welcome to Zudo Business.');
+    localStorage.setItem('isB2B', 'true');
   };
 
   const getDisplayPrice = (product) => {
     if (!isB2B) return { price: product.price, oldPrice: product.oldPrice };
     
-    // Parse numeric value from "₹140/kg"
-    const match = product.price.match(/₹(\d+)/);
-    if (!match) return { price: product.price, oldPrice: product.oldPrice };
+    let basePrice;
+    let unit = 'unit';
+
+    if (typeof product.price === 'number') {
+      basePrice = product.price;
+    } else {
+      const priceStr = String(product.price);
+      const match = priceStr.match(/₹?(\d+)/);
+      basePrice = match ? parseInt(match[1]) : 0;
+      unit = priceStr.split('/')[1] || 'kg';
+    }
+
+    if (!basePrice) return { price: product.price, oldPrice: product.oldPrice };
     
-    const basePrice = parseInt(match[1]);
     const b2bPriceValue = Math.floor(basePrice * 0.75); // 25% bulk discount
-    const unit = product.price.split('/')[1] || 'kg';
     
     return { 
-      price: `₹${b2bPriceValue}/${unit}`, 
-      oldPrice: product.price, // Show original price as old price for B2B
+      price: typeof product.price === 'number' ? `₹${b2bPriceValue}` : `₹${b2bPriceValue}/${unit}`, 
+      oldPrice: typeof product.oldPrice === 'number' ? `₹${product.oldPrice}` : product.oldPrice, 
       isB2B: true
     };
   };
@@ -151,13 +287,26 @@ function App() {
         onNavigateToProduct={navigateToProduct}
         currentPage={currentPage}
         isB2B={isB2B}
-        onLogout={() => { setIsB2B(false); setB2bStatus('none'); showToast('Logged out successfully.'); }}
+        user={user}
+        categories={categories}
+        subcategories={subcategories}
+        allProducts={allProducts}
+        onLogout={() => { 
+          setIsB2B(false); 
+          setUser(null);
+          setB2bStatus('none'); 
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          localStorage.removeItem('isB2B');
+          showToast('Logged out successfully.'); 
+        }}
       />
       
       {b2bStatus === 'pending' && (
         <B2BVerificationScreen 
           onSkip={handleB2BApproval} 
           onBack={() => setB2bStatus('none')} 
+          onUpdateUser={setUser}
         />
       )}
       
@@ -166,7 +315,7 @@ function App() {
           <>
             <div className="relative bg-gradient-to-br from-[#064e3b] via-[#0f766e] to-[#064e3b] text-white overflow-hidden">
               <div className="absolute inset-0 overflow-hidden pointer-events-none">
-                <div className="absolute -top-[20%] -left-[10%] w-[600px] h-[600px] rounded-full bg-emerald-400/20 blur-[120px] mix-blend-screen"></div>
+                <div className="absolute -top-[20%] -left-[10%] w-[600px] h-[600px] rounded-full bg-blue-400/20 blur-[120px] mix-blend-screen"></div>
                 <div className="absolute bottom-[10%] -right-[10%] w-[500px] h-[500px] rounded-full bg-white/10 blur-[120px] mix-blend-screen"></div>
                 <div className="absolute top-[40%] left-[30%] w-[400px] h-[400px] rounded-full bg-teal-400/20 blur-[100px] mix-blend-screen"></div>
               </div>
@@ -176,11 +325,11 @@ function App() {
               </div>
             </div>
             
-            <TopCategories onNavigate={setCurrentPage} onCategoryClick={handleCategoryClick} />
+            <TopCategories onNavigate={setCurrentPage} onCategoryClick={handleCategoryClick} categories={categories} loading={loading} />
             <Showcase />
-            <HomeProducts onAddToCart={addToCart} onUpdateQuantity={updateCartQuantity} onToggleWishlist={toggleWishlist} cartItems={cartItems} wishlistItems={wishlistItems} onNavigateToProduct={navigateToProduct} onNavigate={setCurrentPage} isB2B={isB2B} getDisplayPrice={getDisplayPrice} />
+            <HomeProducts onAddToCart={addToCart} onUpdateQuantity={updateCartQuantity} onToggleWishlist={toggleWishlist} cartItems={cartItems} wishlistItems={wishlistItems} onNavigateToProduct={navigateToProduct} onNavigate={setCurrentPage} isB2B={isB2B} getDisplayPrice={getDisplayPrice} allProducts={allProducts} />
             <PromoBanner onNavigate={setCurrentPage} />
-            <HomeNeeds onAddToCart={addToCart} onUpdateQuantity={updateCartQuantity} onToggleWishlist={toggleWishlist} cartItems={cartItems} wishlistItems={wishlistItems} onNavigateToProduct={navigateToProduct} onNavigate={setCurrentPage} isB2B={isB2B} getDisplayPrice={getDisplayPrice} />
+            <HomeNeeds onAddToCart={addToCart} onUpdateQuantity={updateCartQuantity} onToggleWishlist={toggleWishlist} cartItems={cartItems} wishlistItems={wishlistItems} onNavigateToProduct={navigateToProduct} onNavigate={setCurrentPage} isB2B={isB2B} getDisplayPrice={getDisplayPrice} allProducts={allProducts} />
             <Testimonials />
           </>
         )}
@@ -198,6 +347,10 @@ function App() {
             onNavigateToProduct={navigateToProduct}
             isB2B={isB2B}
             getDisplayPrice={getDisplayPrice}
+            allProducts={allProducts}
+            categories={categories}
+            subcategories={subcategories}
+            loading={loading}
           />
         )}
 
@@ -210,6 +363,9 @@ function App() {
             onNavigate={setCurrentPage}
             onNavigateToProduct={navigateToProduct}
             wishlistItems={wishlistItems}
+            cartItems={cartItems}
+            onUpdateQuantity={updateCartQuantity}
+            allProducts={allProducts}
           />
         )}
 
@@ -236,6 +392,32 @@ function App() {
           />
         )}
 
+        {currentPage === 'checkout' && (
+          <CheckoutPage 
+            cartItems={cartItems} 
+            user={user} 
+            onNavigate={setCurrentPage} 
+            onOrderSuccess={() => {
+              setCartItems([]);
+              showToast('Your order has been placed!');
+            }} 
+          />
+        )}
+
+        {currentPage === 'profile' && (
+          <ProfilePage 
+            user={user} 
+            onUpdateUser={setUser} 
+            onNavigate={setCurrentPage} 
+          />
+        )}
+
+        {currentPage === 'orders' && (
+          <OrdersPage 
+            onNavigate={setCurrentPage} 
+          />
+        )}
+
         {currentPage === 'contact' && (
           <ContactPage />
         )}
@@ -248,7 +430,7 @@ function App() {
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed bottom-6 right-6 bg-gray-900 text-white px-6 py-4 rounded-xl shadow-2xl z-[100] flex items-center gap-3 animate-[slideIn_0.3s_ease-out]">
-          <div className="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center text-white text-xs font-bold">✓</div>
+          <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs font-bold">✓</div>
           <p className="font-medium text-sm">{toastMessage}</p>
         </div>
       )}

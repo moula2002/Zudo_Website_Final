@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
 import { ArrowLeft, Star, Heart, ShoppingCart, Send } from 'lucide-react';
-import { allProducts } from '../data';
 import ProductCard from './ProductCard';
 
-export default function ProductDetails({ product, onAddToCart, onToggleWishlist, isWishlisted, onNavigate, onNavigateToProduct, wishlistItems = [] }) {
+export default function ProductDetails({ product, onAddToCart, onToggleWishlist, isWishlisted, onNavigate, onNavigateToProduct, wishlistItems = [], cartItems = [], onUpdateQuantity, allProducts = [] }) {
   const [activeTab, setActiveTab] = useState('description');
   
   const initialReviews = [
@@ -17,6 +16,8 @@ export default function ProductDetails({ product, onAddToCart, onToggleWishlist,
   const [reviewRating, setReviewRating] = useState(5);
 
   if (!product) return null;
+
+  const cartItem = cartItems.find(item => item.id === product.id);
 
   const similarProducts = allProducts.filter(p => p.category === product.category && p.id !== product.id).slice(0, 4);
 
@@ -51,7 +52,7 @@ export default function ProductDetails({ product, onAddToCart, onToggleWishlist,
           {/* Image */}
           <div className="w-full md:w-[45%] relative flex-shrink-0">
             <div className="rounded-xl overflow-hidden aspect-square bg-gray-50 border border-gray-100 sticky top-32">
-              <img src={product.image} alt={product.name} className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" />
+              <img src={product.image || product.imageUrl} alt={product.name} className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" />
             </div>
             <button 
               onClick={() => onToggleWishlist(product)}
@@ -80,20 +81,54 @@ export default function ProductDetails({ product, onAddToCart, onToggleWishlist,
             </div>
 
             <div className="flex items-baseline gap-3 mb-5">
-              <span className="text-3xl font-extrabold text-emerald-600">{product.price}</span>
-              <span className="text-lg text-gray-400 line-through font-medium">{product.oldPrice}</span>
+              <span className="text-3xl font-extrabold text-emerald-600">
+                {typeof product.price === 'number' ? `₹${product.price}` : (product.price?.startsWith('₹') ? product.price : `₹${product.price}`)}
+              </span>
+              {product.oldPrice && (
+                <span className="text-lg text-gray-400 line-through font-medium">
+                  {typeof product.oldPrice === 'number' ? `₹${product.oldPrice}` : (product.oldPrice?.startsWith('₹') ? product.oldPrice : `₹${product.oldPrice}`)}
+                </span>
+              )}
             </div>
 
             <p className="text-gray-500 text-sm leading-relaxed mb-8">
               {product.description || 'High-quality premium grocery item carefully sourced to ensure maximum freshness and nutritional value for you and your family.'}
             </p>
 
-            <div className="flex items-center gap-4">
+            <div className="flex flex-col sm:flex-row items-center gap-4">
+              {cartItem ? (
+                <div className="flex items-center bg-gray-100 rounded-xl p-1.5 w-full sm:w-auto">
+                  <button 
+                    onClick={() => onUpdateQuantity(product.id, -1)} 
+                    className="w-10 h-10 rounded-lg bg-white text-gray-700 font-bold shadow-sm hover:bg-gray-50 transition-colors flex items-center justify-center text-xl"
+                  >
+                    -
+                  </button>
+                  <span className="w-12 text-center font-black text-gray-900">{cartItem.quantity}</span>
+                  <button 
+                    onClick={() => onUpdateQuantity(product.id, 1)} 
+                    className="w-10 h-10 rounded-lg bg-white text-gray-700 font-bold shadow-sm hover:bg-gray-50 transition-colors flex items-center justify-center text-xl"
+                  >
+                    +
+                  </button>
+                </div>
+              ) : (
+                <button 
+                  onClick={() => onAddToCart(product)}
+                  className="w-full sm:w-auto px-8 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-emerald-600/20 transition-transform transform hover:-translate-y-0.5 flex items-center justify-center gap-2 text-sm"
+                >
+                  <ShoppingCart size={18} /> Add to Cart
+                </button>
+              )}
+
               <button 
-                onClick={() => onAddToCart(product)}
-                className="w-full md:w-auto px-8 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 rounded-xl shadow-md shadow-emerald-600/20 transition-transform transform hover:-translate-y-0.5 flex items-center justify-center gap-2 text-sm"
+                onClick={() => {
+                  if (!cartItem) onAddToCart(product);
+                  onNavigate('checkout');
+                }}
+                className="w-full sm:w-auto px-10 bg-gray-900 hover:bg-black text-white font-bold py-3.5 rounded-xl shadow-lg shadow-gray-900/20 transition-transform transform hover:-translate-y-0.5 flex items-center justify-center gap-2 text-sm"
               >
-                <ShoppingCart size={18} /> Add to Cart
+                Buy Now
               </button>
             </div>
             
