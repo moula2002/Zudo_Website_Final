@@ -55,7 +55,7 @@ export default function CheckoutPage({ cartItems, onNavigate, user, onOrderSucce
     };
 
     try {
-      const response = await fetch('http://localhost:5001/api/orders', {
+      const response = await fetch('https://zudo.onrender.com/api/orders', {
         method: 'POST',
         headers: { 
             'Content-Type': 'application/json',
@@ -93,7 +93,7 @@ export default function CheckoutPage({ cartItems, onNavigate, user, onOrderSucce
       order_id: order.razorpayOrderId,
       handler: async function (response) {
         // Verify payment on backend
-        const verifyResponse = await fetch('http://localhost:5001/api/orders/verify', {
+        const verifyResponse = await fetch('https://zudo.onrender.com/api/orders/verify', {
           method: 'POST',
           headers: { 
             'Content-Type': 'application/json',

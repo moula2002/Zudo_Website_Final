@@ -16,7 +16,7 @@ export default function ProfilePage({ user, onUpdateUser, onNavigate }) {
     // Fetch latest profile data from backend
     const fetchProfile = async () => {
       try {
-        const response = await fetch('http://localhost:5001/api/auth/profile', {
+        const response = await fetch('https://zudo.onrender.com/api/auth/profile', {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`
           }
@@ -75,7 +75,7 @@ export default function ProfilePage({ user, onUpdateUser, onNavigate }) {
     setMessage({ type: '', text: '' });
 
     try {
-      const response = await fetch('http://localhost:5001/api/auth/profile', {
+      const response = await fetch('https://zudo.onrender.com/api/auth/profile', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

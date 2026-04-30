@@ -58,7 +58,7 @@ function App() {
         const fetchInitialData = async () => {
           try {
             setLoading(true);
-            const apiBase = 'http://localhost:5001/api';
+            const apiBase = 'https://zudo.onrender.com/api';
             console.log('Fetching data from:', apiBase);
             
             const [prodRes, catRes, subRes] = await Promise.all([

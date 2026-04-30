@@ -40,7 +40,7 @@ export default function LoginModal({ onClose }) {
     }
 
     const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
-    const apiBase = 'http://localhost:5001';
+    const apiBase = 'https://zudo.onrender.com';
     const uploadBase = 'https://lightgreen-trout-176417.hostingersite.com';
     
     try {

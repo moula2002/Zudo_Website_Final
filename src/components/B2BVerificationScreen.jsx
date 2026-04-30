@@ -25,7 +25,7 @@ export default function B2BVerificationScreen({ onSkip, onBack, user, onUpdateUs
     formData.append('file', file);
 
     const uploadBase = 'https://lightgreen-trout-176417.hostingersite.com';
-    const apiBase = 'http://localhost:5001';
+    const apiBase = 'https://zudo.onrender.com';
 
     try {
       const response = await fetch(`${uploadBase}/api/upload`, {

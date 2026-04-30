@@ -6,8 +6,8 @@ export default function OrdersPage({ onNavigate }) {
   const [loading, setLoading] = useState(true);
   const [expandedOrder, setExpandedOrder] = useState(null);
 
-  const apiBase = 'http://localhost:5001';
-  const uploadBase = 'https://lightgreen-trout-176417.hostingersite.com';
+    const apiBase = 'https://zudo.onrender.com';
+    const uploadBase = 'https://lightgreen-trout-176417.hostingersite.com';
 
   useEffect(() => {
     const fetchOrders = async () => {
