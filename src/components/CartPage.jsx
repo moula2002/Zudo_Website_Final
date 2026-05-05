@@ -57,22 +57,22 @@ export default function CartPage({ cartItems, onUpdateQuantity, onRemove, onNavi
   return (
     <div className="bg-[#fcfdfd] min-h-screen pb-24">
       {/* Page Header Area */}
-      <div className="bg-emerald-600 pt-20 pb-24 px-6 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
+      <div className="bg-emerald-600 pt-10 pb-20 px-6 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-48 h-48 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
         <div className="max-w-6xl mx-auto relative z-10">
           <button 
             onClick={() => onNavigate('home')}
-            className="flex items-center gap-2 text-emerald-100 hover:text-white font-black text-xs uppercase tracking-widest mb-6 transition-all group"
+            className="flex items-center gap-2 text-emerald-100 hover:text-white font-black text-xs uppercase tracking-widest mb-4 transition-all group"
           >
             <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" /> 
             Back to Store
           </button>
-          <h1 className="text-4xl md:text-5xl font-black text-white tracking-tight">Shopping Cart</h1>
-          <p className="text-emerald-100/70 font-bold mt-2">You have {cartItems.length} items in your basket</p>
+          <h1 className="text-2xl md:text-3xl font-black text-white tracking-tight">Shopping Cart</h1>
+          <p className="text-emerald-100/60 font-bold mt-1 text-sm">You have {cartItems.length} items in your basket</p>
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-6 -mt-10 relative z-20">
+      <div className="max-w-6xl mx-auto px-6 -mt-8 relative z-20">
         <div className="flex flex-col lg:flex-row gap-8">
           {/* Cart Items List */}
           <div className="w-full lg:w-2/3">

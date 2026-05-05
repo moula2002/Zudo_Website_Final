@@ -30,6 +30,8 @@ function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState('All');
+  const [selectedSubcategory, setSelectedSubcategory] = useState('All');
+  const [profileTab, setProfileTab] = useState('profile');
   const [user, setUser] = useState(null);
   const [allProducts, setAllProducts] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -142,6 +144,11 @@ function App() {
     fetchInitialData();
   }, []);
 
+  const handleNavigate = (page, tab = 'profile') => {
+    setCurrentPage(page);
+    if (page === 'profile') setProfileTab(tab);
+  };
+
   useEffect(() => {
     if (user?.role === 'business' || user?.role === 'b2b') {
       const hasDocs = user.gstPdf || user.storePic || user.businessName;
@@ -199,8 +206,20 @@ function App() {
   };
 
   const showToast = (message) => { setToastMessage(message); setTimeout(() => setToastMessage(''), 3000); };
-  const handleSearch = (query) => { setSearchQuery(query); if (query.trim() !== '') setCurrentPage('products'); };
-  const handleCategoryClick = (category) => { setSelectedCategory(category); setCurrentPage('products'); };
+  const handleSearch = (query) => {
+    setSearchQuery(query);
+    if (query.trim() !== '') {
+      setSelectedCategory('All');
+      setSelectedSubcategory('All');
+      setCurrentPage('products');
+    }
+  };
+  const handleCategoryClick = (category, subcategory = 'All') => {
+    setSelectedCategory(category);
+    setSelectedSubcategory(subcategory);
+    setSearchQuery('');
+    setCurrentPage('products');
+  };
   const navigateToProduct = (product) => { setSelectedProduct(product); setCurrentPage('productDetails'); };
 
   const getDisplayPrice = (product) => {
@@ -216,7 +235,7 @@ function App() {
         cartCount={cartItems.length} 
         wishlistCount={wishlistItems.length}
         onLoginClick={() => setIsLoginOpen(true)} 
-        onNavigate={setCurrentPage}
+        onNavigate={handleNavigate}
         onSearch={handleSearch}
         onCategoryClick={handleCategoryClick}
         onNavigateToProduct={navigateToProduct}
@@ -270,6 +289,7 @@ function App() {
               <ProductsPage 
                 searchQuery={searchQuery}
                 initialCategory={selectedCategory}
+                initialSubcategory={selectedSubcategory}
                 onAddToCart={addToCart}
                 onUpdateQuantity={updateCartQuantity}
                 onToggleWishlist={toggleWishlist}
@@ -302,7 +322,7 @@ function App() {
             {currentPage === 'cart' && <CartPage cartItems={cartItems} onUpdateQuantity={updateCartQuantity} onRemove={removeFromCart} onNavigate={setCurrentPage} />}
             {currentPage === 'wishlist' && <WishlistPage wishlistItems={wishlistItems} cartItems={cartItems} onAddToCart={addToCart} onUpdateQuantity={updateCartQuantity} onToggleWishlist={toggleWishlist} onNavigate={setCurrentPage} onNavigateToProduct={navigateToProduct} />}
             {currentPage === 'checkout' && <CheckoutPage cartItems={cartItems} user={user} onNavigate={setCurrentPage} onOrderSuccess={() => { setCartItems([]); showToast('Order placed!'); setCurrentPage('home'); }} />}
-            {currentPage === 'profile' && <ProfilePage user={user} onUpdateUser={setUser} onNavigate={setCurrentPage} />}
+            {currentPage === 'profile' && <ProfilePage user={user} onUpdateUser={setUser} onNavigate={handleNavigate} initialTab={profileTab} />}
             {currentPage === 'orders' && <OrdersPage onNavigate={setCurrentPage} />}
             {currentPage === 'contact' && <ContactPage />}
           </>

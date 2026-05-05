@@ -69,39 +69,39 @@ export default function OrdersPage({ onNavigate }) {
   return (
     <div className="min-h-screen bg-[#fcfdfd] pb-24">
       {/* Header Banner */}
-      <div className="bg-[#107569] pt-24 pb-32 px-6 relative overflow-hidden">
+      <div className="bg-[#107569] pt-12 pb-24 px-6 relative overflow-hidden">
         <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-0 right-0 w-64 h-64 bg-white rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl"></div>
-          <div className="absolute bottom-0 left-0 w-96 h-96 bg-black rounded-full translate-y-1/2 -translate-x-1/2 blur-3xl"></div>
+          <div className="absolute top-0 right-0 w-48 h-48 bg-white rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl"></div>
+          <div className="absolute bottom-0 left-0 w-64 h-64 bg-black rounded-full translate-y-1/2 -translate-x-1/2 blur-3xl"></div>
         </div>
         
         <div className="max-w-5xl mx-auto relative z-10">
           <button 
             onClick={() => onNavigate('home')}
-            className="flex items-center gap-2 text-emerald-100 hover:text-white font-bold mb-6 transition-all group"
+            className="flex items-center gap-2 text-emerald-100 hover:text-white font-black text-xs uppercase tracking-widest mb-6 transition-all group"
           >
-            <ArrowLeft size={20} className="group-hover:-translate-x-1 transition-transform" />
-            Back to Shopping
+            <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
+            Back to Home
           </button>
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div>
-              <h1 className="text-4xl md:text-5xl font-black text-white tracking-tight mb-2">Order History</h1>
-              <p className="text-emerald-100/70 font-medium">Track and manage your recent grocery collections</p>
+              <h1 className="text-2xl md:text-3xl font-black text-white tracking-tight mb-1">Order History</h1>
+              <p className="text-emerald-100/60 font-bold text-sm">Track your recent grocery collections</p>
             </div>
-            <div className="flex items-center gap-4 bg-white/10 backdrop-blur-md px-6 py-4 rounded-3xl border border-white/10">
+            <div className="flex items-center gap-3 bg-white/10 backdrop-blur-md px-4 py-3 rounded-2xl border border-white/10">
               <div className="text-right">
-                <p className="text-[10px] font-black text-emerald-200 uppercase tracking-widest">Total Orders</p>
-                <p className="text-2xl font-black text-white leading-none mt-1">{orders.length}</p>
+                <p className="text-[9px] font-black text-emerald-200 uppercase tracking-widest">Total Orders</p>
+                <p className="text-xl font-black text-white leading-none mt-1">{orders.length}</p>
               </div>
-              <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center text-white shadow-lg">
-                <Receipt size={20} />
+              <div className="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center text-white shadow-lg">
+                <Receipt size={16} />
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-6 -mt-16 relative z-20">
+      <div className="max-w-5xl mx-auto px-6 -mt-10 relative z-20">
         {orders.length === 0 ? (
           <div className="bg-white rounded-[2.5rem] p-20 text-center shadow-2xl shadow-emerald-900/5 border border-gray-100 animate-[fadeIn_0.5s_ease-out]">
             <div className="w-32 h-32 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-8">

@@ -12,7 +12,10 @@ export default function ProductsPage({ searchQuery, initialCategory = 'All', ini
   }, [initialCategory, initialSubcategory]);
 
   const filtered = allProducts.filter(p => {
-    const matchesSearch = p.name.toLowerCase().includes((searchQuery || '').toLowerCase());
+    const q = (searchQuery || '').toLowerCase();
+    const matchesSearch = p.name.toLowerCase().includes(q) || 
+                          (p.category || '').toLowerCase().includes(q) || 
+                          (p.subcategory || '').toLowerCase().includes(q);
     const matchesCategory = category === 'All' || p.category === category;
     const matchesSubcategory = subcategory === 'All' || p.subcategory === subcategory;
     return matchesSearch && matchesCategory && matchesSubcategory;
