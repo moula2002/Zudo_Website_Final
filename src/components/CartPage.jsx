@@ -1,7 +1,10 @@
 import React from 'react';
-import { Trash2, ArrowLeft, ShoppingBag, CreditCard, ChevronRight } from 'lucide-react';
+import { Trash2, ArrowLeft, ShoppingBag, CreditCard, ChevronRight, ShieldCheck, Clock } from 'lucide-react';
 
 export default function CartPage({ cartItems, onUpdateQuantity, onRemove, onNavigate }) {
+  const user = JSON.parse(localStorage.getItem('user') || 'null');
+  const isB2BPending = user?.role === 'b2b' && !user.isVerified;
+
   const subtotal = cartItems.reduce((acc, item) => {
     const priceStr = String(item.price);
     const price = parseInt(priceStr.replace(/\D/g, '')) || 0;
@@ -10,6 +13,27 @@ export default function CartPage({ cartItems, onUpdateQuantity, onRemove, onNavi
 
   const deliveryFee = subtotal > 500 ? 0 : 50;
   const total = subtotal + deliveryFee;
+
+  if (isB2BPending) {
+    return (
+      <div className="container mx-auto px-6 py-20 flex flex-col items-center justify-center min-h-[70vh]">
+        <div className="w-48 h-48 bg-amber-50 rounded-full flex items-center justify-center mb-8 relative">
+          <div className="absolute inset-0 bg-amber-100 rounded-full animate-ping opacity-20"></div>
+          <Clock size={80} className="text-amber-500 relative z-10" />
+        </div>
+        <h2 className="text-4xl font-black text-gray-900 mb-4 tracking-tight">Verification Pending</h2>
+        <p className="text-gray-500 mb-10 font-bold max-w-sm text-center leading-relaxed">
+          Your business account is currently under review. Once verified, you'll be able to access wholesale prices and complete your purchase.
+        </p>
+        <button 
+          onClick={() => onNavigate('home')}
+          className="bg-gray-900 hover:bg-black text-white font-black py-4 px-12 rounded-2xl shadow-2xl shadow-gray-900/30 transition-all transform hover:-translate-y-1 hover:scale-105 active:scale-95 flex items-center gap-2"
+        >
+          <ArrowLeft size={20} /> Return to Store
+        </button>
+      </div>
+    );
+  }
 
   if (cartItems.length === 0) {
     return (

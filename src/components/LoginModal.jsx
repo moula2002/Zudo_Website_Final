@@ -1,17 +1,23 @@
 import React, { useState } from 'react';
-import { X } from 'lucide-react';
+import { X, UserCircle, ShoppingBag, ArrowLeft, Mail, Lock, Phone, Building2, FileText, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { auth, googleProvider } from '../../firebase';
+import { signInWithPopup } from 'firebase/auth';
+import { API_URL, API_BASE_URL } from '../config';
 
-export default function LoginModal({ onClose }) {
+export default function LoginModal({ onClose, setUser, initialB2B = null }) {
+  const [selection, setSelection] = useState(initialB2B === 'b2c' || initialB2B === 'b2b' ? initialB2B : null);
   const [isLogin, setIsLogin] = useState(true);
-  const [isB2B, setIsB2B] = useState(false);
+  const [isB2B, setIsB2B] = useState(initialB2B === 'b2b');
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     password: '',
-    companyName: ''
+    companyName: '',
+    phone: ''
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showBackendWarning, setShowBackendWarning] = useState(false);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -28,6 +34,116 @@ export default function LoginModal({ onClose }) {
     }
   };
 
+  const handleGoogleLogin = async () => {
+    setLoading(true);
+    setError('');
+    setShowBackendWarning(false);
+    
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      const fbUser = result.user;
+
+      try {
+        const response = await fetch(`${API_URL}/auth/google-login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: fbUser.displayName,
+            email: fbUser.email,
+            profilePicture: fbUser.photoURL,
+            role: isB2B ? 'b2b' : 'b2c'
+          })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          // SAFE ROLE CHECK: Support both wrapped {user: {role}} and flat {role}
+          const returnedUser = data.user || data;
+          const returnedRole = returnedUser?.role;
+          const expectedRole = isB2B ? 'b2b' : 'b2c';
+
+          if (returnedRole && returnedRole !== expectedRole) {
+             throw new Error(`This account is registered as ${returnedRole.toUpperCase()}. Please register as ${expectedRole.toUpperCase()} to continue.`);
+          }
+
+          saveAndFinalize(data);
+          return;
+        }
+
+        if (response.status === 401) {
+          throw new Error(data.message || 'Login rejected by server');
+        }
+
+        if (response.status === 404) {
+          const fallbackPassword = `fb_${fbUser.uid}_google`;
+          const regResponse = await fetch(`${API_URL}/auth/register`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name: fbUser.displayName,
+              email: fbUser.email,
+              password: fallbackPassword,
+              role: isB2B ? 'b2b' : 'b2c',
+              profilePicture: fbUser.photoURL
+            })
+          });
+
+          if (regResponse.ok) {
+            const regData = await regResponse.json();
+            saveAndFinalize(regData);
+            return;
+          }
+        }
+        throw new Error('Database sync failed');
+      } catch (syncErr) {
+        if (syncErr.message.includes('registered as')) {
+           throw syncErr;
+        }
+        console.error('Final sync attempt failed:', syncErr);
+        setShowBackendWarning(true);
+        handleLocalFallback(fbUser);
+      }
+    } catch (err) {
+      setError(err.message);
+      setLoading(false);
+    }
+  };
+
+  const saveAndFinalize = (data) => {
+    // Ensure we save the user object correctly regardless of structure
+    const userData = data.user || { ...data, token: undefined };
+    localStorage.setItem('token', data.token);
+    localStorage.setItem('user', JSON.stringify(userData));
+    if (setUser) setUser(userData);
+    finalizeLogin(userData);
+  };
+
+  const handleLocalFallback = (fbUser) => {
+    const userData = {
+      _id: fbUser.uid,
+      name: fbUser.displayName,
+      email: fbUser.email,
+      profileImage: fbUser.photoURL,
+      role: isB2B ? 'b2b' : 'b2c',
+      isVerified: false,
+      isLocalOnly: true 
+    };
+    localStorage.setItem('user', JSON.stringify(userData));
+    localStorage.setItem('token', 'local_' + fbUser.uid);
+    if (setUser) setUser(userData);
+    finalizeLogin(userData);
+  };
+
+  const finalizeLogin = (user) => {
+    if (isB2B) {
+      localStorage.setItem('isB2B', 'true');
+    }
+    setTimeout(() => {
+      window.location.reload();
+    }, 500);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -39,39 +155,38 @@ export default function LoginModal({ onClose }) {
       return;
     }
 
-    const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
-    const apiBase = 'https://zudo.onrender.com';
-    const uploadBase = 'https://lightgreen-trout-176417.hostingersite.com';
+    const endpoint = isLogin ? '/auth/user-login' : '/auth/register';
     
     try {
       let finalDocUrl = '';
       
-      // If it's registration and B2B, upload the file to the LIVE site
       if (!isLogin && isB2B && documentFile) {
         const uploadData = new FormData();
         uploadData.append('file', documentFile);
         
-        const uploadRes = await fetch(`${uploadBase}/api/upload`, {
+        const uploadRes = await fetch(`${API_URL}/upload`, {
           method: 'POST',
           body: uploadData
         });
         
-        if (!uploadRes.ok) throw new Error('Document upload failed on live server');
+        if (!uploadRes.ok) throw new Error('Document upload failed');
         const uploadResult = await uploadRes.json();
-        finalDocUrl = `${uploadBase}${uploadResult.url}`;
+        finalDocUrl = `${API_BASE_URL}${uploadResult.url}`;
       }
 
       const payload = isLogin 
-        ? { email: formData.email, password: formData.password }
+        ? { email: formData.email, password: formData.password, role: isB2B ? 'b2b' : 'b2c' }
         : { 
-            name: isB2B ? formData.companyName : formData.name, 
+            name: formData.name, 
             email: formData.email, 
             password: formData.password,
-            role: isB2B ? 'business' : 'user',
-            businessDocument: finalDocUrl
+            phone: formData.phone,
+            role: isB2B ? 'b2b' : 'b2c',
+            businessName: isB2B ? formData.companyName : '',
+            gstPdf: isB2B ? finalDocUrl : ''
           };
 
-      const response = await fetch(`${apiBase}${endpoint}`, {
+      const response = await fetch(`${API_URL}${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -83,185 +198,131 @@ export default function LoginModal({ onClose }) {
         throw new Error(data.error || data.message || 'Something went wrong');
       }
 
-      // Store token and user info
-      localStorage.setItem('token', data.token);
-      localStorage.setItem('user', JSON.stringify(data.user));
+      // SAFE ROLE CHECK: Support both wrapped {user: {role}} and flat {role}
+      const returnedUser = data.user || data;
+      const returnedRole = returnedUser?.role;
+      const expectedRole = isB2B ? 'b2b' : 'b2c';
 
-      if (isB2B && data.user.role === 'business' && !data.user.isVerified) {
-        // Business user needs verification
-        setIsB2B(false);
-      } else if (isB2B) {
-        localStorage.setItem('isB2B', 'true');
-        window.dispatchEvent(new CustomEvent('b2b-login'));
+      if (returnedRole && returnedRole !== expectedRole) {
+         throw new Error(`This account is registered as ${returnedRole.toUpperCase()}. Please register as ${expectedRole.toUpperCase()} to continue.`);
       }
-      
-      onClose();
-      window.location.reload(); 
+
+      saveAndFinalize(data);
     } catch (err) {
       setError(err.message);
-    } finally {
       setLoading(false);
     }
   };
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl w-full max-w-3xl flex overflow-hidden shadow-2xl relative animate-[fadeIn_0.3s_ease-out]">
-        
-        {/* Left Side - Image */}
-        <div className="w-1/2 hidden md:block relative bg-gray-100">
-          <img 
-            src={isB2B ? "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&q=80&w=800" : "/grains_splash.png"} 
-            alt="Groceries" 
-            className="absolute inset-0 w-full h-full object-cover transition-all duration-700" 
-          />
-          <div className="absolute inset-0 bg-black/40 flex items-end p-6">
-            <h3 className="text-white text-2xl font-bold leading-tight">
-              {isB2B ? 'Zudo B2B Solutions.' : 'Zudo Premium Groceries.'}<br/>
-              <span className="text-emerald-400">{isB2B ? 'Wholesale prices for your business.' : 'Quality you can trust.'}</span>
-            </h3>
-          </div>
-        </div>
+      <div className="bg-white rounded-3xl w-full max-w-3xl flex overflow-hidden shadow-2xl relative animate-[fadeIn_0.3s_ease-out]">
+        <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-black transition-all z-[110] bg-gray-50 p-1.5 rounded-full">
+          <X size={18} />
+        </button>
 
-        {/* Right Side - Form */}
-        <div className="w-full md:w-1/2 p-6 md:p-8 relative bg-white">
-          <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-black transition-colors">
-            <X size={20} />
-          </button>
-
-          <div className="mb-6">
-            <div className="flex items-center gap-2 mb-2">
-              <h2 className="text-2xl font-extrabold text-black">
-                {isLogin ? (isB2B ? 'Business Login' : 'Welcome Back') : (isB2B ? 'Business Registration' : 'Create Account')}
-              </h2>
-              {isB2B && <span className="bg-emerald-600 text-white text-[8px] font-black px-2 py-0.5 rounded-full uppercase">B2B</span>}
-            </div>
-            <p className="text-gray-500 text-sm">
-              {isLogin ? 'Please enter your details to sign in.' : (isB2B ? 'Register your business to unlock bulk pricing.' : 'Join us to get the best quality groceries delivered to you.')}
-            </p>
-          </div>
-
-          {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-600 text-xs font-bold rounded-lg animate-[fadeIn_0.3s_ease-out]">
-              {error}
-            </div>
-          )}
-
-          <form className="space-y-4" onSubmit={handleSubmit}>
-            {!isLogin && (
-              <div className="animate-[fadeIn_0.3s_ease-out] space-y-4">
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">{isB2B ? 'Company Name' : 'Full Name'}</label>
-                  <input 
-                    type="text" 
-                    name={isB2B ? "companyName" : "name"}
-                    value={isB2B ? formData.companyName : formData.name}
-                    onChange={handleChange}
-                    placeholder={isB2B ? "Enter company name" : "Enter your full name"} 
-                    className="w-full px-3 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 transition-all text-sm" 
-                    required 
-                  />
+        {!selection ? (
+          <div className="w-full flex flex-col md:flex-row min-h-[400px]">
+             <div className="flex-1 group relative overflow-hidden flex flex-col items-center justify-center p-8 transition-all duration-700 hover:bg-emerald-50/50 border-r border-gray-100">
+                <div className="relative z-10 flex flex-col items-center text-center">
+                  <div className="w-20 h-20 bg-emerald-600 rounded-2xl flex items-center justify-center text-white mb-6 shadow-xl shadow-emerald-600/20 group-hover:scale-110 transition-all duration-500">
+                    <UserCircle size={40} />
+                  </div>
+                  <h3 className="text-2xl font-black text-gray-900 mb-2 tracking-tight">Personal</h3>
+                  <p className="text-gray-500 font-bold text-xs max-w-[200px]">Shop our fresh grocery collection.</p>
+                  <button onClick={() => { setSelection('b2c'); setIsB2B(false); }} className="mt-6 px-6 py-3 bg-white border-2 border-emerald-600 text-emerald-700 font-black text-xs rounded-xl hover:bg-emerald-600 hover:text-white transition-all duration-300 shadow-lg shadow-emerald-600/5">Continue as Customer</button>
                 </div>
+             </div>
 
-                {isB2B && (
-                  <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-1">Business Documents (PDF only)</label>
+             <div className="flex-1 group relative overflow-hidden flex flex-col items-center justify-center p-8 transition-all duration-700 hover:bg-gray-50">
+                <div className="relative z-10 flex flex-col items-center text-center">
+                  <div className="w-20 h-20 bg-gray-900 rounded-2xl flex items-center justify-center text-white mb-6 shadow-xl shadow-gray-900/20 group-hover:scale-110 transition-all duration-500 group-hover:bg-emerald-500 group-hover:shadow-emerald-500/20">
+                    <Building2 size={40} />
+                  </div>
+                  <h3 className="text-2xl font-black text-gray-900 mb-2 tracking-tight">Business</h3>
+                  <p className="text-gray-500 font-bold text-xs max-w-[200px]">Bulk pricing and wholesale distributions.</p>
+                  <button onClick={() => { setSelection('b2b'); setIsB2B(true); }} className="mt-6 px-6 py-3 bg-gray-900 text-white font-black text-xs rounded-xl hover:bg-emerald-600 transition-all duration-300">Partner Portal</button>
+                </div>
+             </div>
+          </div>
+        ) : (
+          <>
+            <div className="w-2/5 hidden md:block relative bg-gray-100 overflow-hidden">
+              <img src={isB2B ? "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&q=80&w=800" : "https://images.unsplash.com/photo-1542831371-29b0f74f9713?auto=format&fit=crop&q=80&w=800"} alt="Groceries" className="absolute inset-0 w-full h-full object-cover" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex flex-col justify-end p-8">
+                <h3 className="text-white text-2xl font-black mb-2">{isB2B ? 'Zudo B2B Solutions.' : 'Premium Groceries.'}</h3>
+                <p className="text-white/70 font-bold text-xs">{isB2B ? 'Wholesale rates for your business.' : 'Quality you can trust.'}</p>
+              </div>
+            </div>
+
+            <div className="w-full md:w-3/5 p-8 relative bg-white flex flex-col justify-center max-h-[90vh] overflow-y-auto">
+              <div className="mb-6">
+                <button onClick={() => { setSelection(null); setIsB2B(false); }} className="flex items-center gap-2 text-emerald-600 font-black text-[9px] uppercase tracking-widest mb-4 hover:translate-x-[-2px] transition-transform"><ArrowLeft size={12} strokeWidth={3} />Change Account Type</button>
+                <div className="flex items-center gap-2 mb-1">
+                  <h2 className="text-2xl font-black text-gray-900 tracking-tight">{isLogin ? 'Welcome Back' : 'Get Started'}</h2>
+                  {isB2B && <span className="bg-gray-900 text-white text-[8px] font-black px-2 py-0.5 rounded uppercase">B2B</span>}
+                </div>
+              </div>
+
+              {error && <div className="mb-4 p-3 bg-red-50 border border-red-100 text-red-600 text-[10px] font-black rounded-xl">{error}</div>}
+
+              <form className="space-y-4" onSubmit={handleSubmit}>
+                {!isLogin && (
+                  <div className="space-y-4">
                     <div className="relative group">
-                      <input 
-                        type="file" 
-                        accept=".pdf" 
-                        onChange={handleFileChange}
-                        className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 transition-all text-xs file:mr-4 file:py-1 file:px-3 file:rounded-full file:border-0 file:text-[10px] file:font-black file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 cursor-pointer" 
-                        required 
-                      />
+                      <UserCircle className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-emerald-600" size={16} />
+                      <input type="text" name="name" value={formData.name} onChange={handleChange} placeholder="Full Name" className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-100 bg-gray-50/50 focus:bg-white text-xs font-bold" required />
                     </div>
+                    {isB2B && (
+                      <div className="relative group">
+                        <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-emerald-600" size={16} />
+                        <input type="text" name="companyName" value={formData.companyName} onChange={handleChange} placeholder="Company Name" className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-100 bg-gray-50/50 focus:bg-white text-xs font-bold" required />
+                      </div>
+                    )}
+                    <div className="relative group">
+                      <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-emerald-600" size={16} />
+                      <input type="tel" name="phone" value={formData.phone} onChange={handleChange} placeholder="Phone Number" className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-100 bg-gray-50/50 focus:bg-white text-xs font-bold" required />
+                    </div>
+                    {isB2B && (
+                      <div className="relative group p-3 border border-dashed border-gray-200 rounded-xl cursor-pointer">
+                        <input type="file" accept=".pdf,image/*" onChange={handleFileChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" required />
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider text-center">{documentFile ? documentFile.name : 'Upload Documents'}</p>
+                      </div>
+                    )}
                   </div>
                 )}
-              </div>
-            )}
-            
-            <div>
-              <label className="block text-sm font-bold text-gray-700 mb-1">Email Address</label>
-              <input 
-                type="email" 
-                name="email"
-                value={formData.email}
-                onChange={handleChange}
-                placeholder="Enter your email" 
-                className="w-full px-3 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 transition-all text-sm" 
-                required 
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-bold text-gray-700 mb-1">Password</label>
-              <input 
-                type="password" 
-                name="password"
-                value={formData.password}
-                onChange={handleChange}
-                placeholder="••••••••" 
-                className="w-full px-3 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 transition-all text-sm" 
-                required 
-              />
-            </div>
-            
-            {isLogin && (
-              <div className="flex items-center justify-between animate-[fadeIn_0.3s_ease-out]">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" className="rounded border-gray-300 w-3.5 h-3.5 accent-emerald-600" />
-                  <span className="text-sm text-gray-600 font-medium">Remember me</span>
-                </label>
-                <a href="#" className="text-sm font-bold text-emerald-600 hover:underline">Forgot Password?</a>
-              </div>
-            )}
-
-            <button 
-              type="submit" 
-              disabled={loading}
-              className={`w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-lg shadow-lg shadow-emerald-600/30 transform hover:-translate-y-0.5 transition-all text-sm mt-2 flex items-center justify-center gap-2 ${loading ? 'opacity-70 cursor-not-allowed' : ''}`}
-            >
-              {loading && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>}
-              {isLogin ? (isB2B ? 'Business Sign In' : 'Sign In') : (isB2B ? 'Register Business' : 'Sign Up')}
-            </button>
-
-            {isLogin && !isB2B && (
-              <>
-                <div className="relative flex items-center gap-4 py-2">
-                  <div className="flex-grow h-px bg-gray-100"></div>
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">or</span>
-                  <div className="flex-grow h-px bg-gray-100"></div>
+                
+                <div className="relative group">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-emerald-600" size={16} />
+                  <input type="email" name="email" value={formData.email} onChange={handleChange} placeholder="Email Address" className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-100 bg-gray-50/50 focus:bg-white text-xs font-bold" required />
+                </div>
+                
+                <div className="relative group">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-emerald-600" size={16} />
+                  <input type="password" name="password" value={formData.password} onChange={handleChange} placeholder="Password" className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-100 bg-gray-50/50 focus:bg-white text-xs font-bold" required />
                 </div>
 
-                <button 
-                  type="button"
-                  onClick={() => setIsB2B(true)}
-                  className="w-full bg-gray-900 hover:bg-black text-white font-bold py-2.5 rounded-lg shadow-lg shadow-gray-900/20 transform hover:-translate-y-0.5 transition-all text-sm flex items-center justify-center gap-2"
-                >
-                  <div className="w-5 h-5 rounded bg-emerald-500 flex items-center justify-center text-[10px] font-black">B2B</div>
-                  Business Portal
+                <button type="submit" disabled={loading} className={`w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-3 rounded-xl shadow-lg transition-all text-xs mt-2 flex items-center justify-center gap-2 ${loading ? 'opacity-70' : ''}`}>
+                  {loading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : <>{isLogin ? 'Sign In' : 'Create Account'}</>}
                 </button>
-              </>
-            )}
 
-            {isB2B && (
-              <button 
-                type="button"
-                onClick={() => { setIsB2B(false); setIsLogin(true); }}
-                className="w-full text-center text-xs font-bold text-gray-400 hover:text-emerald-600 transition-colors mt-4"
-              >
-                &larr; Back to Regular Login
-              </button>
-            )}
-          </form>
+                <div className="relative flex items-center gap-3 py-2">
+                  <div className="flex-grow h-px bg-gray-100"></div>
+                  <span className="text-[8px] font-black text-gray-300 uppercase tracking-widest">OR</span>
+                  <div className="flex-grow h-px bg-gray-100"></div>
+                </div>
+                <button type="button" onClick={handleGoogleLogin} disabled={loading} className="w-full bg-white border border-gray-100 text-gray-700 font-black py-2.5 rounded-xl shadow-sm hover:bg-gray-50 transition-all text-[10px] flex items-center justify-center gap-2">
+                  <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-4 h-4" />
+                  Google
+                </button>
+              </form>
 
-          <p className="text-center mt-6 text-sm text-gray-600">
-            {isLogin ? "Don't have an account? " : "Already have an account? "}
-            <button onClick={() => setIsLogin(!isLogin)} className="font-bold text-emerald-600 hover:underline">
-              {isLogin ? (isB2B ? 'Register Business' : 'Create one here') : 'Sign in here'}
-            </button>
-          </p>
-        </div>
+              <div className="mt-6 text-center">
+                <p className="text-gray-400 font-bold text-[10px]">{isLogin ? "New here? " : "Joined already? "}<button onClick={() => setIsLogin(!isLogin)} className="text-emerald-600 font-black uppercase tracking-widest ml-1 hover:underline">{isLogin ? 'Sign Up' : 'Sign In'}</button></p>
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

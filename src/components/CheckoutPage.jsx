@@ -1,18 +1,25 @@
-import React, { useState } from 'react';
-import { CreditCard, Truck, MapPin, Phone, User, CheckCircle2, ChevronRight, ArrowLeft } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { CreditCard, Truck, MapPin, Phone, User, CheckCircle2, ChevronRight, ArrowLeft, Search } from 'lucide-react';
+import { useLocation } from '../hooks/useLocation';
+import { API_URL } from '../config';
 
 export default function CheckoutPage({ cartItems, onNavigate, user, onOrderSuccess }) {
+  const { address: liveAddress, city: liveCity, refresh: getLiveLocation, loading: locationLoading } = useLocation();
   const [shippingData, setShippingData] = useState({
     name: user?.name || '',
     email: user?.email || '',
     phone: user?.phone || '',
     address: '',
     city: '',
-    pincode: ''
+    pincode: '',
+    lat: null,
+    lng: null
   });
   const [paymentMethod, setPaymentMethod] = useState('COD');
   const [loading, setLoading] = useState(false);
   const [orderComplete, setOrderComplete] = useState(false);
+  const [showSaved, setShowSaved] = useState(false);
+  const savedAddresses = user?.savedAddresses || [];
 
   const subtotal = cartItems.reduce((acc, item) => {
     const priceStr = String(item.price);
@@ -45,6 +52,8 @@ export default function CheckoutPage({ cartItems, onNavigate, user, onOrderSucce
 
         return {
           product: item.id,
+          name: item.name,
+          image: item.image,
           quantity: item.quantity,
           price: basePrice
         };
@@ -55,7 +64,7 @@ export default function CheckoutPage({ cartItems, onNavigate, user, onOrderSucce
     };
 
     try {
-      const response = await fetch('https://zudo.onrender.com/api/orders', {
+      const response = await fetch(`${API_URL}/orders`, {
         method: 'POST',
         headers: { 
             'Content-Type': 'application/json',
@@ -93,7 +102,7 @@ export default function CheckoutPage({ cartItems, onNavigate, user, onOrderSucce
       order_id: order.razorpayOrderId,
       handler: async function (response) {
         // Verify payment on backend
-        const verifyResponse = await fetch('https://zudo.onrender.com/api/orders/verify', {
+        const verifyResponse = await fetch(`${API_URL}/orders/verify`, {
           method: 'POST',
           headers: { 
             'Content-Type': 'application/json',
@@ -149,10 +158,13 @@ export default function CheckoutPage({ cartItems, onNavigate, user, onOrderSucce
         {/* Left: Shipping & Payment */}
         <div className="lg:col-span-2 space-y-8">
           <section className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
-            <h3 className="text-xl font-black text-gray-900 mb-6 flex items-center gap-3">
-              <MapPin className="text-emerald-600" size={24} />
-              Shipping Address
-            </h3>
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-black text-gray-900 flex items-center gap-3">
+                <MapPin className="text-emerald-600" size={24} />
+                Shipping Address
+              </h3>
+            </div>
+
             <form className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Full Name</label>
@@ -215,7 +227,86 @@ export default function CheckoutPage({ cartItems, onNavigate, user, onOrderSucce
                 </div>
               </div>
               <div className="md:col-span-2">
-                <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Delivery Address</label>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-xs font-black text-gray-400 uppercase tracking-widest">Delivery Address</label>
+                  <div className="flex gap-2">
+                    {savedAddresses.length > 0 && (
+                      <button 
+                        type="button"
+                        onClick={() => setShowSaved(!showSaved)}
+                        className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-200 text-gray-700 rounded-lg text-[10px] font-black uppercase tracking-widest hover:border-emerald-500 transition-all active:scale-95"
+                      >
+                        <User size={12} />
+                        {showSaved ? 'Close' : 'Saved'}
+                      </button>
+                    )}
+                    <button 
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          const loc = await getLiveLocation();
+                          if (loc && loc.address) {
+                            setShippingData(prev => ({
+                              ...prev,
+                              address: loc.address,
+                              city: loc.city,
+                              pincode: loc.pincode,
+                              lat: loc.lat,
+                              lng: loc.lng
+                            }));
+                          }
+                        } catch (err) {
+                          console.error('Location fetch failed:', err);
+                        }
+                      }}
+                      className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-emerald-100 transition-all active:scale-95"
+                    >
+                      {locationLoading ? (
+                        <div className="w-2.5 h-2.5 border-2 border-emerald-700/30 border-t-emerald-700 rounded-full animate-spin" />
+                      ) : <Search size={12} />}
+                      Live Location
+                    </button>
+                  </div>
+                </div>
+
+                {showSaved && savedAddresses.length > 0 && (
+                  <div className="mb-4 grid grid-cols-1 gap-2 p-3 bg-gray-50 rounded-2xl animate-[fadeIn_0.2s_ease-out] border border-gray-100 max-h-60 overflow-y-auto">
+                    <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 px-1">Select saved location</p>
+                    {savedAddresses.map((addr) => (
+                      <button
+                        key={addr._id || addr.id}
+                        type="button"
+                        onClick={() => {
+                          setShippingData(prev => ({
+                            ...prev,
+                            address: addr.address || addr.text,
+                            city: addr.city || '',
+                            pincode: addr.pincode || '',
+                            lat: addr.lat,
+                            lng: addr.lng
+                          }));
+                          setShowSaved(false);
+                        }}
+                        className="flex items-center justify-between p-3 bg-white border border-gray-100 rounded-xl hover:border-emerald-500 transition-all text-left group"
+                      >
+                        <div className="flex items-start gap-2">
+                          <div className="mt-1 h-3 w-3 rounded-full border-2 border-emerald-600 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="h-1.5 w-1.5 bg-emerald-600 rounded-full" />
+                          </div>
+                          <div>
+                            <p className="text-xs font-bold text-gray-800 line-clamp-1">{addr.address || addr.text}</p>
+                            <p className="text-[9px] text-gray-400 font-bold uppercase">
+                              {addr.city} {addr.pincode && `• ${addr.pincode}`}
+                            </p>
+                          </div>
+                        </div>
+                        {addr.isDefault && (
+                          <span className="px-1.5 py-0.5 bg-emerald-600 text-white text-[7px] font-black uppercase tracking-widest rounded">Primary</span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 <textarea 
                   name="address"
                   value={shippingData.address}

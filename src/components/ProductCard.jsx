@@ -1,7 +1,9 @@
 import React from 'react';
-import { Heart, Plus, Minus, Star } from 'lucide-react';
+import { Heart, Plus, Minus, Star, Clock } from 'lucide-react';
 
 export default function ProductCard({ product, onAddToCart, onUpdateQuantity, onToggleWishlist, isWishlisted, quantity = 0 }) {
+  const isPending = product.price === 'Verification Pending';
+
   return (
     <div className="bg-white rounded-3xl p-2 transition-all duration-500 group relative border border-gray-100 hover:border-gray-900-200 hover:shadow-[0_40px_80px_-20px_rgba(17,24,39,0.15)] flex flex-col h-full transform hover:-translate-y-2 max-w-[280px] mx-auto w-full shadow-sm">
       
@@ -35,40 +37,42 @@ export default function ProductCard({ product, onAddToCart, onUpdateQuantity, on
         )}
 
         {/* Action Overlay (Desktop Only) */}
-        <div className="absolute inset-x-0 bottom-0 p-4 translate-y-full group-hover:translate-y-0 transition-transform duration-500 ease-out z-20 hidden md:block">
-          <div className="bg-white/90 backdrop-blur-md rounded-2xl p-3 shadow-2xl flex items-center justify-between border border-white/20">
-             <div className="flex flex-col">
-               <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tight">Price per unit</span>
-               <span className="text-sm font-black text-gray-900-600">
-                 {typeof product.price === 'number' ? `₹${product.price}` : (product.price?.startsWith('₹') ? product.price : `₹${product.price}`)}
-               </span>
-             </div>
-             {quantity > 0 ? (
-               <div className="flex items-center gap-1.5 bg-black rounded-lg p-0.5 shadow-lg shadow-gray-900-600/30">
-                 <button 
-                   onClick={(e) => { e.stopPropagation(); onUpdateQuantity && onUpdateQuantity(product.id, -1); }}
-                   className="w-6 h-6 rounded-md flex items-center justify-center text-white hover:bg-white/20 transition-colors"
-                 >
-                   <Minus size={12} strokeWidth={3} />
-                 </button>
-                 <span className="text-white font-black text-xs min-w-[1rem] text-center">{quantity}</span>
-                 <button 
-                   onClick={(e) => { e.stopPropagation(); onUpdateQuantity && onUpdateQuantity(product.id, 1); }}
-                   className="w-6 h-6 rounded-md flex items-center justify-center text-white hover:bg-white/20 transition-colors"
-                 >
-                   <Plus size={12} strokeWidth={3} />
-                 </button>
+        {!isPending && (
+          <div className="absolute inset-x-0 bottom-0 p-4 translate-y-full group-hover:translate-y-0 transition-transform duration-500 ease-out z-20 hidden md:block">
+            <div className="bg-white/90 backdrop-blur-md rounded-2xl p-3 shadow-2xl flex items-center justify-between border border-white/20">
+               <div className="flex flex-col">
+                 <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tight">Price per unit</span>
+                 <span className="text-sm font-black text-gray-900-600">
+                   {typeof product.price === 'number' ? `₹${product.price}` : (product.price?.startsWith('₹') ? product.price : `₹${product.price}`)}
+                 </span>
                </div>
-             ) : (
-               <button 
-                 onClick={(e) => { e.stopPropagation(); onAddToCart && onAddToCart(product); }}
-                 className="bg-black text-white w-8 h-8 rounded-xl flex items-center justify-center hover:bg-gray-900-700 transition-colors shadow-lg shadow-gray-900-600/30"
-               >
-                 <Plus size={18} strokeWidth={3} />
-               </button>
-             )}
+               {quantity > 0 ? (
+                 <div className="flex items-center gap-1.5 bg-black rounded-lg p-0.5 shadow-lg shadow-gray-900-600/30">
+                   <button 
+                     onClick={(e) => { e.stopPropagation(); onUpdateQuantity && onUpdateQuantity(product.id, -1); }}
+                     className="w-6 h-6 rounded-md flex items-center justify-center text-white hover:bg-white/20 transition-colors"
+                   >
+                     <Minus size={12} strokeWidth={3} />
+                   </button>
+                   <span className="text-white font-black text-xs min-w-[1rem] text-center">{quantity}</span>
+                   <button 
+                     onClick={(e) => { e.stopPropagation(); onUpdateQuantity && onUpdateQuantity(product.id, 1); }}
+                     className="w-6 h-6 rounded-md flex items-center justify-center text-white hover:bg-white/20 transition-colors"
+                   >
+                     <Plus size={12} strokeWidth={3} />
+                   </button>
+                 </div>
+               ) : (
+                 <button 
+                   onClick={(e) => { e.stopPropagation(); onAddToCart && onAddToCart(product); }}
+                   className="bg-black text-white w-8 h-8 rounded-xl flex items-center justify-center hover:bg-gray-900-700 transition-colors shadow-lg shadow-gray-900-600/30"
+                 >
+                   <Plus size={18} strokeWidth={3} />
+                 </button>
+               )}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Subtle dark overlay */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
@@ -77,7 +81,7 @@ export default function ProductCard({ product, onAddToCart, onUpdateQuantity, on
       {/* Content Section */}
       <div className="flex-grow px-4 pt-3 pb-1 flex flex-col">
         <div className="flex items-center flex-wrap gap-2 mb-3">
-          <span className="bg-gray-900-50 text-gray-900-600 text-[10px] font-black px-2.5 py-1 rounded-lg uppercase tracking-wider">{product.category || 'Grocery'}</span>
+          <span className="bg-gray-50 text-gray-600 text-[10px] font-black px-2.5 py-1 rounded-lg uppercase tracking-wider">{product.category || 'Grocery'}</span>
           {product.subcategory && (
             <span className="bg-amber-50 text-amber-500 text-[9px] font-bold px-2 py-0.5 rounded-md border border-amber-100 tracking-wide">
               {product.subcategory}
@@ -89,51 +93,59 @@ export default function ProductCard({ product, onAddToCart, onUpdateQuantity, on
           </div>
         </div>
         
-        <h3 className="text-gray-900 font-black leading-tight group-hover:text-gray-900-600 transition-colors line-clamp-2 min-h-[2.5rem]">
+        <h3 className="text-gray-900 font-black leading-tight group-hover:text-gray-900 transition-colors line-clamp-2 min-h-[2.5rem]">
           {product.name}
         </h3>
         
         <div className="mt-1 pt-3 border-t border-gray-50 flex items-center justify-between">
           <div className="flex flex-col">
-            {product.oldPrice && (
+            {!isPending && product.oldPrice && (
               <span className="text-gray-400 text-[11px] line-through font-bold mb-0.5 tracking-tight">₹{product.oldPrice}</span>
             )}
-            <div className="flex items-baseline gap-1.5">
-              <span className="text-gray-900-600 font-black text-xl tracking-tighter">
-                {typeof product.price === 'number' ? `₹${product.price}` : (product.price?.startsWith('₹') ? product.price : `₹${product.price}`)}
+            <div className="flex flex-col">
+              <span className={`font-black tracking-tighter ${isPending ? 'text-amber-600 text-sm flex items-center gap-1 animate-pulse' : 'text-gray-900 text-xl'}`}>
+                {isPending && <Clock size={12} />}
+                {typeof product.price === 'number' ? `₹${product.price}` : (product.price?.startsWith('₹') ? product.price : (isPending ? product.price : `₹${product.price}`))}
               </span>
-              {product.isB2B && (
+              {!isPending && product.isB2B && (
                 <div className="flex items-center gap-1.5 mt-1">
                   <span className="text-[8px] font-black bg-gray-900 text-white px-1.5 py-0.5 rounded uppercase tracking-tighter">B2B</span>
-                  <span className="text-[8px] font-bold text-gray-900-600 bg-gray-900-50 px-1.5 py-0.5 rounded border border-gray-900-100 uppercase tracking-tighter">Min Qty: 4</span>
+                  <span className="text-[8px] font-bold text-gray-900 bg-gray-50 px-1.5 py-0.5 rounded border border-gray-100 uppercase tracking-tighter">Min Qty: 4</span>
                 </div>
+              )}
+              {isPending && (
+                <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest mt-1">Verification Required</span>
               )}
             </div>
           </div>
           
-          {quantity > 0 ? (
-            <div className="md:hidden flex items-center gap-3 bg-black rounded-2xl p-1 shadow-lg shadow-gray-900-600/20">
-              <button 
-                onClick={(e) => { e.stopPropagation(); onUpdateQuantity && onUpdateQuantity(product.id, -1); }}
-                className="w-7 h-7 rounded-xl flex items-center justify-center text-white hover:bg-white/20 transition-colors"
-              >
-                <Minus size={14} strokeWidth={3} />
-              </button>
-              <span className="text-white font-black text-sm w-4 text-center">{quantity}</span>
-              <button 
-                onClick={(e) => { e.stopPropagation(); onUpdateQuantity && onUpdateQuantity(product.id, 1); }}
-                className="w-7 h-7 rounded-xl flex items-center justify-center text-white hover:bg-white/20 transition-colors"
-              >
-                <Plus size={14} strokeWidth={3} />
-              </button>
-            </div>
-          ) : (
-            <button 
-              onClick={(e) => { e.stopPropagation(); onAddToCart && onAddToCart(product); }}
-              className="md:hidden bg-black text-white w-8 h-8 rounded-2xl flex items-center justify-center transition-all duration-300 shadow-lg shadow-gray-900-600/20 active:scale-90"
-            >
-              <Plus size={18} strokeWidth={3} />
-            </button>
+          {!isPending && (
+            <>
+              {quantity > 0 ? (
+                <div className="md:hidden flex items-center gap-3 bg-black rounded-2xl p-1 shadow-lg shadow-gray-900-600/20">
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); onUpdateQuantity && onUpdateQuantity(product.id, -1); }}
+                    className="w-7 h-7 rounded-xl flex items-center justify-center text-white hover:bg-white/20 transition-colors"
+                  >
+                    <Minus size={14} strokeWidth={3} />
+                  </button>
+                  <span className="text-white font-black text-sm w-4 text-center">{quantity}</span>
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); onUpdateQuantity && onUpdateQuantity(product.id, 1); }}
+                    className="w-7 h-7 rounded-xl flex items-center justify-center text-white hover:bg-white/20 transition-colors"
+                  >
+                    <Plus size={14} strokeWidth={3} />
+                  </button>
+                </div>
+              ) : (
+                <button 
+                  onClick={(e) => { e.stopPropagation(); onAddToCart && onAddToCart(product); }}
+                  className="md:hidden bg-black text-white w-8 h-8 rounded-2xl flex items-center justify-center transition-all duration-300 shadow-lg shadow-gray-900-600/20 active:scale-90"
+                >
+                  <Plus size={18} strokeWidth={3} />
+                </button>
+              )}
+            </>
           )}
         </div>
       </div>

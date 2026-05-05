@@ -18,6 +18,7 @@ import B2BVerificationScreen from './components/B2BVerificationScreen';
 import CheckoutPage from './components/CheckoutPage';
 import ProfilePage from './components/ProfilePage';
 import OrdersPage from './components/OrdersPage';
+import { API_URL, API_BASE_URL } from './config';
 import './App.css';
 
 function App() {
@@ -34,110 +35,139 @@ function App() {
   const [categories, setCategories] = useState([]);
   const [subcategories, setSubcategories] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isB2B, setIsB2B] = useState(false);
+  const [b2bStatus, setB2bStatus] = useState('none');
 
-  // Initialize auth state
-  useEffect(() => {
+  // Load user from storage immediately
+  const loadUserFromStorage = () => {
     const savedUser = localStorage.getItem('user');
     if (savedUser) {
-      const parsedUser = JSON.parse(savedUser);
-      setUser(parsedUser);
-      
-      // Set initial B2B status based on saved user
-      if (parsedUser.role === 'business') {
-        if (parsedUser.isVerified) {
-          setB2bStatus('approved');
-          setIsB2B(true);
-        } else {
-          setB2bStatus('pending');
-          setIsB2B(false);
-        }
+      try {
+        const parsedUser = JSON.parse(savedUser);
+        setUser(parsedUser);
+        return parsedUser;
+      } catch (e) {
+        console.error('Failed to parse saved user');
       }
     }
+    return null;
+  };
 
-    // Fetch initial data
-        const fetchInitialData = async () => {
-          try {
-            setLoading(true);
-            const apiBase = 'https://zudo.onrender.com/api';
-            console.log('Fetching data from:', apiBase);
-            
-            const [prodRes, catRes, subRes] = await Promise.all([
-              fetch(`${apiBase}/products`),
-              fetch(`${apiBase}/categories`),
-              fetch(`${apiBase}/subcategories`)
-            ]);
+  useEffect(() => {
+    loadUserFromStorage();
+    const handleLoginEvent = () => loadUserFromStorage();
+    window.addEventListener('user-login-success', handleLoginEvent);
+    return () => window.removeEventListener('user-login-success', handleLoginEvent);
+  }, []);
 
-            if (!prodRes.ok) console.warn('Products fetch failed:', prodRes.status);
-            if (!catRes.ok) console.warn('Categories fetch failed:', catRes.status);
-            if (!subRes.ok) console.warn('Subcategories fetch failed:', subRes.status);
+  useEffect(() => {
+    const syncProfile = async () => {
+      const token = localStorage.getItem('token');
+      if (!token) return;
 
-            // Fetch latest user profile if token exists
-            const token = localStorage.getItem('token');
-            if (token) {
-              try {
-                const profileRes = await fetch(`${apiBase}/auth/profile`, {
-                  headers: { 'Authorization': `Bearer ${token}` }
-                });
-                if (profileRes.ok) {
-                  const latestUser = await profileRes.json();
-                  setUser(latestUser);
-                  localStorage.setItem('user', JSON.stringify(latestUser));
-                }
-              } catch (err) {
-                console.error('Failed to sync profile:', err);
-              }
-            }
+      try {
+        // Now using API_URL which is set to localhost
+        const profileRes = await fetch(`${API_URL}/auth/profile`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }).catch(() => null);
 
-            const prodData = prodRes.ok ? await prodRes.json() : [];
-            const catData = catRes.ok ? await catRes.json() : [];
-            const subData = subRes.ok ? await subRes.json() : [];
+        if (profileRes && profileRes.ok) {
+          const latestUser = await profileRes.json();
+          setUser(latestUser);
+          localStorage.setItem('user', JSON.stringify(latestUser));
+        } else if (profileRes && profileRes.status === 401) {
+          handleLogout();
+        }
+      } catch (err) {
+        console.error('App: Profile sync error:', err);
+      }
+    };
 
-            // Map MongoDB _id to id for frontend compatibility and resolve category names
-            const mappedProducts = prodData.map(p => {
-              const cat = catData.find(c => c._id === (p.category || p.categoryId));
-              const sub = subData.find(s => s._id === (p.subcategory || p.subCategoryId));
-              
-              return {
-                ...p,
-                id: p._id,
-                image: p.imageUrl || p.image,
-                category: cat ? cat.name : (p.category?.name || p.category),
-                subcategory: sub ? sub.name : (p.subcategory?.name || p.subcategory)
-              };
-            });
+    const fetchInitialData = async () => {
+      try {
+        setLoading(true);
+        // Use local API for everything now
+        const [prodRes, catRes, subRes] = await Promise.all([
+          fetch(`${API_URL}/products`),
+          fetch(`${API_URL}/categories`),
+          fetch(`${API_URL}/subcategories`)
+        ]).catch(() => [null, null, null]);
 
-            const mappedSubs = subData.map(s => {
-              const catId = s.category?._id || s.category || s.categoryId;
-              return {
-                ...s,
-                image: s.imageUrl || s.image,
-                category: catId
-              };
-            });
+        const prodData = prodRes && prodRes.ok ? await prodRes.json() : [];
+        const catData = catRes && catRes.ok ? await catRes.json() : [];
+        const subData = subRes && subRes.ok ? await subRes.json() : [];
 
-            setAllProducts(mappedProducts);
-            setCategories(catData);
-            setSubcategories(mappedSubs);
-          } catch (err) {
-            console.error('Failed to fetch initial data:', err);
-          } finally {
-            setLoading(false);
-          }
-        };
+        const mappedCats = catData.map(c => ({
+          ...c,
+          id: c._id || c.id,
+          name: c.name || c.categoryKey || 'Unknown',
+          image: c.image || c.imageUrl
+        }));
 
+        const mappedSubs = subData.map(s => ({
+          ...s,
+          id: s._id || s.id,
+          name: s.name || s.subcategoryKey || 'Unknown',
+          image: s.image || s.imageUrl,
+          category: s.categoryId?._id || s.categoryId || s.category?._id || s.category
+        }));
+
+        const mappedProducts = prodData.map(p => {
+          const pCatId = p.categoryId?._id || p.categoryId || p.category?._id || p.category;
+          const pSubId = p.subCategoryId?._id || p.subCategoryId || p.subcategory?._id || p.subcategory;
+          
+          const foundCat = mappedCats.find(c => c.id === pCatId);
+          const foundSub = mappedSubs.find(s => s.id === pSubId);
+          
+          return {
+            ...p,
+            id: p._id || p.id,
+            image: p.imageUrl || p.image,
+            category: foundCat ? foundCat.name : (p.categoryId?.name || p.category?.name || 'All'),
+            subcategory: foundSub ? foundSub.name : (p.subCategoryId?.name || p.subcategory?.name || 'All')
+          };
+        });
+
+        setAllProducts(mappedProducts);
+        setCategories(mappedCats);
+        setSubcategories(mappedSubs);
+      } catch (err) {
+        console.error('Failed to fetch initial data:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    syncProfile();
     fetchInitialData();
   }, []);
 
-  const [selectedSubcategory, setSelectedSubcategory] = useState('All');
-
-  // Scroll to top when page changes
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, [currentPage]);
+    if (user?.role === 'business' || user?.role === 'b2b') {
+      const hasDocs = user.gstPdf || user.storePic || user.businessName;
+      if (user.isVerified) {
+        setB2bStatus('approved');
+        setIsB2B(true);
+      } else if (!hasDocs) {
+        setB2bStatus('pending');
+        setIsB2B(false);
+      } else {
+        setB2bStatus('none');
+        setIsB2B(false);
+      }
+    } else {
+      setB2bStatus('none');
+      setIsB2B(false);
+    }
+  }, [user]);
 
-  const showToast = (message) => {
-    setToastMessage(message);
-    setTimeout(() => setToastMessage(''), 3000);
+  const handleLogout = () => {
+    setUser(null);
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    localStorage.removeItem('isB2B');
+    showToast('Logged out successfully.'); 
+    setCurrentPage('home');
   };
 
   const addToCart = (product) => {
@@ -153,29 +183,13 @@ function App() {
   };
 
   const updateCartQuantity = (id, delta) => {
-    const minQty = isB2B ? 4 : 1;
-    setCartItems(prev => {
-      const updated = prev.map(item => {
-        if (item.id === id) {
-          let newQty = item.quantity + delta;
-          // In B2B mode, if quantity drops below the minimum (4), we set it to 0 to remove it
-          if (isB2B && newQty < 4 && delta < 0) {
-            newQty = 0;
-          }
-          return { ...item, quantity: newQty };
-        }
-        return item;
-      }).filter(item => item.quantity > 0);
-      
-      const removed = prev.find(item => item.id === id && item.quantity === minQty && delta === -1);
-      if (removed) showToast(`${removed.name} removed from cart.`);
-      
-      return updated;
-    });
+    setCartItems(prev => prev.map(item => {
+      if (item.id === id) return { ...item, quantity: Math.max(0, item.quantity + delta) };
+      return item;
+    }).filter(item => item.quantity > 0));
   };
 
   const removeFromCart = (id) => setCartItems(prev => prev.filter(item => item.id !== id));
-
   const toggleWishlist = (product) => {
     setWishlistItems(prev => {
       const existing = prev.find(item => item.id === product.id);
@@ -184,95 +198,16 @@ function App() {
     });
   };
 
-  const handleSearch = (query) => {
-    setSearchQuery(query);
-    setSelectedCategory('All'); 
-    setSelectedSubcategory('All');
-    if (query.trim() !== '') {
-      setCurrentPage('products');
-    }
-  };
-
-  const handleCategoryClick = (category, subcategory = 'All') => {
-    setSelectedCategory(category);
-    setSelectedSubcategory(subcategory);
-    setSearchQuery(''); 
-    setCurrentPage('products');
-  };
-
-  const navigateToProduct = (product) => {
-    setSelectedProduct(product);
-    setCurrentPage('productDetails');
-  };
-
-  const [isB2B, setIsB2B] = useState(false);
-  const [b2bStatus, setB2bStatus] = useState('none'); // 'none', 'pending', 'approved'
-
-  useEffect(() => {
-    const handleB2BLogin = () => {
-      const savedUser = JSON.parse(localStorage.getItem('user'));
-      if (savedUser?.role === 'business' && !savedUser.isVerified) {
-        setB2bStatus('pending');
-        setIsB2B(false);
-        localStorage.removeItem('isB2B');
-      } else {
-        setB2bStatus('approved');
-        setIsB2B(true);
-        localStorage.setItem('isB2B', 'true');
-      }
-    };
-    window.addEventListener('b2b-login', handleB2BLogin);
-    return () => window.removeEventListener('b2b-login', handleB2BLogin);
-  }, []);
-
-  useEffect(() => {
-    if (user?.role === 'business') {
-      if (user.isVerified) {
-        setB2bStatus('approved');
-        setIsB2B(true);
-        localStorage.setItem('isB2B', 'true');
-      } else {
-        setB2bStatus('pending');
-        setIsB2B(false);
-        localStorage.removeItem('isB2B');
-      }
-    } else {
-      setB2bStatus('none');
-      setIsB2B(false);
-    }
-  }, [user]);
-
-  const handleB2BApproval = () => {
-    // This is a local bypass for testing or if we had a socket/polling
-    setB2bStatus('approved');
-    setIsB2B(true);
-    localStorage.setItem('isB2B', 'true');
-  };
+  const showToast = (message) => { setToastMessage(message); setTimeout(() => setToastMessage(''), 3000); };
+  const handleSearch = (query) => { setSearchQuery(query); if (query.trim() !== '') setCurrentPage('products'); };
+  const handleCategoryClick = (category) => { setSelectedCategory(category); setCurrentPage('products'); };
+  const navigateToProduct = (product) => { setSelectedProduct(product); setCurrentPage('productDetails'); };
 
   const getDisplayPrice = (product) => {
-    if (!isB2B) return { price: product.price, oldPrice: product.oldPrice };
-    
-    let basePrice;
-    let unit = 'unit';
-
-    if (typeof product.price === 'number') {
-      basePrice = product.price;
-    } else {
-      const priceStr = String(product.price);
-      const match = priceStr.match(/₹?(\d+)/);
-      basePrice = match ? parseInt(match[1]) : 0;
-      unit = priceStr.split('/')[1] || 'kg';
+    if ((user?.role === 'business' || user?.role === 'b2b') && !user.isVerified) {
+       return { price: "Verification Pending", oldPrice: null, isB2B: true };
     }
-
-    if (!basePrice) return { price: product.price, oldPrice: product.oldPrice };
-    
-    const b2bPriceValue = Math.floor(basePrice * 0.75); // 25% bulk discount
-    
-    return { 
-      price: typeof product.price === 'number' ? `₹${b2bPriceValue}` : `₹${b2bPriceValue}/${unit}`, 
-      oldPrice: typeof product.oldPrice === 'number' ? `₹${product.oldPrice}` : product.oldPrice, 
-      isB2B: true
-    };
+    return { price: `₹${product.price}`, oldPrice: product.oldPrice };
   };
 
   return (
@@ -291,146 +226,94 @@ function App() {
         categories={categories}
         subcategories={subcategories}
         allProducts={allProducts}
-        onLogout={() => { 
-          setIsB2B(false); 
-          setUser(null);
-          setB2bStatus('none'); 
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
-          localStorage.removeItem('isB2B');
-          showToast('Logged out successfully.'); 
-        }}
+        onLogout={handleLogout}
       />
       
       {b2bStatus === 'pending' && (
         <B2BVerificationScreen 
-          onSkip={handleB2BApproval} 
+          onSkip={() => setB2bStatus('none')} 
           onBack={() => setB2bStatus('none')} 
           onUpdateUser={setUser}
+          user={user}
         />
       )}
       
       <div className="flex-grow flex flex-col pt-[72px]">
-        {currentPage === 'home' && (
+        {loading ? (
+          <div className="flex-grow flex items-center justify-center">
+            <div className="w-10 h-10 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
+          </div>
+        ) : (
           <>
-            <div className="relative bg-gradient-to-br from-[#064e3b] via-[#0f766e] to-[#064e3b] text-white overflow-hidden">
-              <div className="absolute inset-0 overflow-hidden pointer-events-none">
-                <div className="absolute -top-[20%] -left-[10%] w-[600px] h-[600px] rounded-full bg-blue-400/20 blur-[120px] mix-blend-screen"></div>
-                <div className="absolute bottom-[10%] -right-[10%] w-[500px] h-[500px] rounded-full bg-white/10 blur-[120px] mix-blend-screen"></div>
-                <div className="absolute top-[40%] left-[30%] w-[400px] h-[400px] rounded-full bg-teal-400/20 blur-[100px] mix-blend-screen"></div>
-              </div>
-              
-              <div className="relative z-10">
-                <Hero onNavigate={setCurrentPage} />
-              </div>
-            </div>
-            
-            <TopCategories onNavigate={setCurrentPage} onCategoryClick={handleCategoryClick} categories={categories} loading={loading} />
-            <Showcase />
-            <HomeProducts onAddToCart={addToCart} onUpdateQuantity={updateCartQuantity} onToggleWishlist={toggleWishlist} cartItems={cartItems} wishlistItems={wishlistItems} onNavigateToProduct={navigateToProduct} onNavigate={setCurrentPage} isB2B={isB2B} getDisplayPrice={getDisplayPrice} allProducts={allProducts} />
-            <PromoBanner onNavigate={setCurrentPage} />
-            <HomeNeeds onAddToCart={addToCart} onUpdateQuantity={updateCartQuantity} onToggleWishlist={toggleWishlist} cartItems={cartItems} wishlistItems={wishlistItems} onNavigateToProduct={navigateToProduct} onNavigate={setCurrentPage} isB2B={isB2B} getDisplayPrice={getDisplayPrice} allProducts={allProducts} />
-            <Testimonials />
+            {currentPage === 'home' && (
+              <>
+                <div className="relative bg-gradient-to-br from-[#064e3b] via-[#0f766e] to-[#064e3b] text-white overflow-hidden">
+                  <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                    <div className="absolute -top-[20%] -left-[10%] w-[600px] h-[600px] rounded-full bg-blue-400/20 blur-[120px] mix-blend-screen"></div>
+                    <div className="absolute bottom-[10%] -right-[10%] w-[500px] h-[500px] rounded-full bg-white/10 blur-[120px] mix-blend-screen"></div>
+                    <div className="absolute top-[40%] left-[30%] w-[400px] h-[400px] rounded-full bg-teal-400/20 blur-[100px] mix-blend-screen"></div>
+                  </div>
+                  <div className="relative z-10">
+                    <Hero onNavigate={setCurrentPage} />
+                  </div>
+                </div>
+                <TopCategories onNavigate={setCurrentPage} onCategoryClick={handleCategoryClick} categories={categories} />
+                <Showcase />
+                <HomeProducts onAddToCart={addToCart} onUpdateQuantity={updateCartQuantity} onToggleWishlist={toggleWishlist} cartItems={cartItems} wishlistItems={wishlistItems} onNavigateToProduct={navigateToProduct} onNavigate={setCurrentPage} isB2B={isB2B} getDisplayPrice={getDisplayPrice} allProducts={allProducts} />
+                <PromoBanner onNavigate={setCurrentPage} />
+                <HomeNeeds onAddToCart={addToCart} onUpdateQuantity={updateCartQuantity} onToggleWishlist={toggleWishlist} cartItems={cartItems} wishlistItems={wishlistItems} onNavigateToProduct={navigateToProduct} onNavigate={setCurrentPage} isB2B={isB2B} getDisplayPrice={getDisplayPrice} allProducts={allProducts} />
+                <Testimonials />
+              </>
+            )}
+
+            {currentPage === 'products' && (
+              <ProductsPage 
+                searchQuery={searchQuery}
+                initialCategory={selectedCategory}
+                onAddToCart={addToCart}
+                onUpdateQuantity={updateCartQuantity}
+                onToggleWishlist={toggleWishlist}
+                cartItems={cartItems}
+                wishlistItems={wishlistItems}
+                onNavigateToProduct={navigateToProduct}
+                isB2B={isB2B}
+                getDisplayPrice={getDisplayPrice}
+                allProducts={allProducts}
+                categories={categories}
+                subcategories={subcategories}
+              />
+            )}
+
+            {currentPage === 'productDetails' && (
+              <ProductDetails 
+                product={selectedProduct}
+                onAddToCart={addToCart}
+                onToggleWishlist={toggleWishlist}
+                isWishlisted={wishlistItems.some(item => item.id === selectedProduct?.id)}
+                onNavigate={setCurrentPage}
+                onNavigateToProduct={navigateToProduct}
+                wishlistItems={wishlistItems}
+                cartItems={cartItems}
+                onUpdateQuantity={updateCartQuantity}
+                allProducts={allProducts}
+              />
+            )}
+
+            {currentPage === 'cart' && <CartPage cartItems={cartItems} onUpdateQuantity={updateCartQuantity} onRemove={removeFromCart} onNavigate={setCurrentPage} />}
+            {currentPage === 'wishlist' && <WishlistPage wishlistItems={wishlistItems} cartItems={cartItems} onAddToCart={addToCart} onUpdateQuantity={updateCartQuantity} onToggleWishlist={toggleWishlist} onNavigate={setCurrentPage} onNavigateToProduct={navigateToProduct} />}
+            {currentPage === 'checkout' && <CheckoutPage cartItems={cartItems} user={user} onNavigate={setCurrentPage} onOrderSuccess={() => { setCartItems([]); showToast('Order placed!'); setCurrentPage('home'); }} />}
+            {currentPage === 'profile' && <ProfilePage user={user} onUpdateUser={setUser} onNavigate={setCurrentPage} />}
+            {currentPage === 'orders' && <OrdersPage onNavigate={setCurrentPage} />}
+            {currentPage === 'contact' && <ContactPage />}
           </>
-        )}
-
-        {currentPage === 'products' && (
-          <ProductsPage 
-            searchQuery={searchQuery}
-            initialCategory={selectedCategory}
-            initialSubcategory={selectedSubcategory}
-            onAddToCart={addToCart}
-            onUpdateQuantity={updateCartQuantity}
-            onToggleWishlist={toggleWishlist}
-            cartItems={cartItems}
-            wishlistItems={wishlistItems}
-            onNavigateToProduct={navigateToProduct}
-            isB2B={isB2B}
-            getDisplayPrice={getDisplayPrice}
-            allProducts={allProducts}
-            categories={categories}
-            subcategories={subcategories}
-            loading={loading}
-          />
-        )}
-
-        {currentPage === 'productDetails' && (
-          <ProductDetails 
-            product={selectedProduct}
-            onAddToCart={addToCart}
-            onToggleWishlist={toggleWishlist}
-            isWishlisted={wishlistItems.some(item => item.id === selectedProduct?.id)}
-            onNavigate={setCurrentPage}
-            onNavigateToProduct={navigateToProduct}
-            wishlistItems={wishlistItems}
-            cartItems={cartItems}
-            onUpdateQuantity={updateCartQuantity}
-            allProducts={allProducts}
-          />
-        )}
-
-        {currentPage === 'cart' && (
-          <CartPage 
-            cartItems={cartItems} 
-            onUpdateQuantity={updateCartQuantity} 
-            onRemove={removeFromCart} 
-            onNavigate={setCurrentPage} 
-          />
-        )}
-
-        {currentPage === 'wishlist' && (
-          <WishlistPage 
-            wishlistItems={wishlistItems} 
-            cartItems={cartItems}
-            onAddToCart={addToCart} 
-            onUpdateQuantity={updateCartQuantity}
-            onToggleWishlist={toggleWishlist} 
-            onNavigate={setCurrentPage} 
-            onNavigateToProduct={navigateToProduct}
-            isB2B={isB2B}
-            getDisplayPrice={getDisplayPrice}
-          />
-        )}
-
-        {currentPage === 'checkout' && (
-          <CheckoutPage 
-            cartItems={cartItems} 
-            user={user} 
-            onNavigate={setCurrentPage} 
-            onOrderSuccess={() => {
-              setCartItems([]);
-              showToast('Your order has been placed!');
-            }} 
-          />
-        )}
-
-        {currentPage === 'profile' && (
-          <ProfilePage 
-            user={user} 
-            onUpdateUser={setUser} 
-            onNavigate={setCurrentPage} 
-          />
-        )}
-
-        {currentPage === 'orders' && (
-          <OrdersPage 
-            onNavigate={setCurrentPage} 
-          />
-        )}
-
-        {currentPage === 'contact' && (
-          <ContactPage />
         )}
       </div>
 
       <Footer onNavigate={setCurrentPage} />
+      {isLoginOpen && <LoginModal onClose={() => setIsLoginOpen(false)} setUser={setUser} />}
 
-      {isLoginOpen && <LoginModal onClose={() => setIsLoginOpen(false)} />}
-
-      {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 bg-gray-900 text-white px-6 py-4 rounded-xl shadow-2xl z-[100] flex items-center gap-3 animate-[slideIn_0.3s_ease-out]">
-          <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs font-bold">✓</div>
+        <div className="fixed bottom-6 right-6 bg-gray-900 text-white px-6 py-4 rounded-xl shadow-2xl z-[100] flex items-center gap-3">
           <p className="font-medium text-sm">{toastMessage}</p>
         </div>
       )}
@@ -439,5 +322,3 @@ function App() {
 }
 
 export default App;
-
-

@@ -20,7 +20,7 @@ export default function ProductsPage({ searchQuery, initialCategory = 'All', ini
 
   const categoriesData = backendCategories.reduce((acc, cat) => {
     acc[cat.name] = subcategories
-      .filter(sub => sub.category === cat._id || sub.category?._id === cat._id)
+      .filter(sub => sub.category === cat.id)
       .map(sub => ({ name: sub.name, img: sub.image }));
     return acc;
   }, {});

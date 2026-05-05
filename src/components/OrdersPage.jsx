@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Package, Calendar, Clock, ChevronRight, ShoppingBag, ArrowLeft, CheckCircle2, Truck, AlertCircle, MapPin, Receipt, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react';
+import { API_URL, API_BASE_URL } from '../config';
 
 export default function OrdersPage({ onNavigate }) {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expandedOrder, setExpandedOrder] = useState(null);
 
-    const apiBase = 'https://zudo.onrender.com';
-    const uploadBase = 'https://lightgreen-trout-176417.hostingersite.com';
+    const apiBase = API_BASE_URL;
+    const uploadBase = API_BASE_URL;
 
   useEffect(() => {
     const fetchOrders = async () => {
@@ -156,7 +157,7 @@ export default function OrdersPage({ onNavigate }) {
                       <div className="flex -space-x-4">
                         {order.items.slice(0, 3).map((item, idx) => (
                           <div key={idx} className="w-12 h-12 rounded-2xl border-4 border-white bg-white overflow-hidden shadow-md transform hover:-translate-y-2 hover:z-10 transition-all cursor-pointer">
-                            <img src={formatImageUrl(item.product?.imageUrl || item.product?.image)} alt="Item" className="w-full h-full object-cover" />
+                            <img src={formatImageUrl(item.product?.imageUrl || item.product?.image || item.image || item.imageUrl)} alt="Item" className="w-full h-full object-cover" />
                           </div>
                         ))}
                         {order.items.length > 3 && (
@@ -234,7 +235,7 @@ export default function OrdersPage({ onNavigate }) {
                             <div key={idx} className={`p-4 flex items-center justify-between gap-4 ${idx !== order.items.length - 1 ? 'border-bottom border-gray-50' : ''}`}>
                               <div className="flex items-center gap-4">
                                 <div className="w-12 h-12 rounded-xl bg-gray-50 overflow-hidden border border-gray-100">
-                                  <img src={formatImageUrl(item.product?.imageUrl || item.product?.image)} alt={item.product?.name} className="w-full h-full object-cover" />
+                                  <img src={formatImageUrl(item.product?.imageUrl || item.product?.image || item.image || item.imageUrl)} alt={item.product?.name || item.name} className="w-full h-full object-cover" />
                                 </div>
                                 <div>
                                   <p className="font-black text-gray-900 text-sm leading-none mb-1">{item.product?.name || 'Unknown Product'}</p>

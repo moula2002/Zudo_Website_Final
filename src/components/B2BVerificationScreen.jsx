@@ -1,177 +1,195 @@
 import React, { useState } from 'react';
-import { ShieldCheck, Clock, FileText, ArrowRight, CheckCircle2, X, Upload, FileUp, AlertCircle } from 'lucide-react';
+import { ShieldCheck, Clock, FileText, ArrowRight, CheckCircle2, X, Upload, FileUp, AlertCircle, Camera, CreditCard } from 'lucide-react';
+import { API_URL, API_BASE_URL } from '../config';
 
 export default function B2BVerificationScreen({ onSkip, onBack, user, onUpdateUser }) {
-  const [uploading, setUploading] = useState(false);
-  const [docUrl, setDocUrl] = useState('');
+  const [uploading, setUploading] = useState({ doc: false, store: false, submitting: false });
+  const [docUrl, setDocUrl] = useState(user?.gstPdf || '');
+  const [storePicUrl, setStorePicUrl] = useState(user?.storePic || '');
+  const [taxId, setTaxId] = useState(user?.gstNumber || user?.panNumber || user?.aadhaarNumber || '');
+  const [taxType, setTaxType] = useState('gst');
   const [error, setError] = useState('');
-  const [status, setStatus] = useState('pending'); // pending, uploaded, verified
+  const [status, setStatus] = useState(user?.gstPdf ? 'uploaded' : 'pending');
 
-  const handleFileUpload = async (e) => {
+  const HOSTINGER_BASE = 'https://lightgreen-trout-176417.hostingersite.com';
+
+  const handleFileUpload = async (e, type) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    // Check file type
-    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
-    if (!allowedTypes.includes(file.type)) {
-      setError('Please upload a PDF or Image (JPG/PNG)');
-      return;
-    }
-
-    setUploading(true);
+    setUploading(prev => ({ ...prev, [type]: true }));
     setError('');
     
     const formData = new FormData();
     formData.append('file', file);
 
-    const uploadBase = 'https://lightgreen-trout-176417.hostingersite.com';
-    const apiBase = 'https://zudo.onrender.com';
-
     try {
-      const response = await fetch(`${uploadBase}/api/upload`, {
+      console.log(`STEP 1: Uploading ${type} to HOSTINGER storage...`);
+      // User specifically requested Hostinger for uploads
+      const response = await fetch(`${HOSTINGER_BASE}/api/upload`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
         body: formData
       });
 
       const data = await response.json();
       if (!response.ok) throw new Error(data.message || 'Upload failed');
 
-      const fullUrl = `${uploadBase}${data.url}`;
-      setDocUrl(fullUrl);
-      setStatus('uploaded');
+      const savedUrl = `${HOSTINGER_BASE}${data.url}`;
+      console.log(`STEP 2: Received HOSTINGER URL:`, savedUrl);
+
+      if (type === 'doc') setDocUrl(savedUrl);
+      else setStorePicUrl(savedUrl);
       
-      // Update user verification document in LOCAL backend
-      const updateRes = await fetch(`${apiBase}/api/auth/profile`, {
-        method: 'PUT',
+    } catch (err) {
+      console.error('Upload error:', err);
+      setError('Upload failed: ' + err.message);
+    } finally {
+      setUploading(prev => ({ ...prev, [type]: false }));
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (!docUrl || !taxId) {
+      setError('Please provide all required business details.');
+      return;
+    }
+
+    setUploading(prev => ({ ...prev, submitting: true }));
+    setError('');
+
+    try {
+      const payload = {
+        gstPdf: docUrl,
+        storePic: storePicUrl,
+        gstNumber: taxType === 'gst' ? taxId : '',
+        panNumber: taxType === 'pan' ? taxId : '',
+        aadhaarNumber: taxType === 'aadhaar' ? taxId : '',
+        isWaitingApproval: true
+      };
+
+      console.log('STEP 4: Saving Hostinger URLs to LOCAL MongoDB User record...', payload);
+
+      // Save to local as requested ("use local host")
+      const response = await fetch(`${API_URL}/auth/b2b-verify-submit`, {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
-        body: JSON.stringify({ businessDocument: fullUrl })
+        body: JSON.stringify(payload)
       });
 
-      if (updateRes.ok) {
-        const updatedUser = await updateRes.json();
-        if (onUpdateUser) onUpdateUser(updatedUser);
-        localStorage.setItem('user', JSON.stringify(updatedUser));
+      const data = await response.json();
+      console.log('STEP 5: MongoDB Response:', data);
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Local database save failed.');
       }
 
+      localStorage.setItem('user', JSON.stringify(data));
+      if (onUpdateUser) onUpdateUser(data);
+      
+      setStatus('uploaded');
+      
+      setTimeout(() => {
+        onSkip();
+      }, 2000);
+      
     } catch (err) {
+      console.error('SUBMIT ERROR:', err);
       setError(err.message);
     } finally {
-      setUploading(false);
+      setUploading(prev => ({ ...prev, submitting: false }));
     }
   };
 
   return (
     <div className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white rounded-[2rem] w-full max-w-lg shadow-2xl overflow-hidden animate-[fadeIn_0.3s_ease-out] relative">
-        <button onClick={onBack} className="absolute top-6 right-6 text-gray-400 hover:text-black transition-colors">
+      <div className="bg-white rounded-[2.5rem] w-full max-w-xl shadow-2xl overflow-hidden animate-[fadeIn_0.3s_ease-out] relative max-h-[95vh] flex flex-col">
+        <button onClick={onBack} className="absolute top-6 right-6 text-gray-400 hover:text-black transition-colors z-10">
           <X size={24} />
         </button>
 
-        <div className="p-8 sm:p-10">
-          {/* Header Section */}
+        <div className="p-8 sm:p-10 overflow-y-auto">
           <div className="text-center mb-8">
-            <div className="w-16 h-16 bg-emerald-50 rounded-2xl flex items-center justify-center mx-auto mb-4 relative">
-              <div className="absolute inset-0 rounded-2xl border-2 border-emerald-500 border-t-transparent animate-spin"></div>
-              <ShieldCheck size={28} className="text-emerald-600" />
+            <div className="w-16 h-16 bg-emerald-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <ShieldCheck size={32} className="text-emerald-600" />
             </div>
-            <h1 className="text-2xl font-black text-gray-900 mb-2 tracking-tight">B2B Verification</h1>
-            <p className="text-gray-500 text-sm font-medium px-4">
-              Upload your Business License or GST document to unlock wholesale pricing.
-            </p>
+            <h1 className="text-2xl font-black text-gray-900 mb-2 tracking-tight">Business Verification</h1>
+            <p className="text-gray-500 text-sm font-medium">Documents are stored on Hostinger server.</p>
           </div>
 
-          {/* Upload Section */}
-          <div className="mb-8">
-            {status === 'pending' ? (
-              <label className={`relative flex flex-col items-center justify-center w-full h-40 border-2 border-dashed rounded-3xl cursor-pointer transition-all ${uploading ? 'bg-gray-50 border-gray-200' : 'bg-emerald-50/30 border-emerald-200 hover:bg-emerald-50 hover:border-emerald-400'}`}>
-                <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                  {uploading ? (
-                    <div className="flex flex-col items-center">
-                      <div className="w-10 h-10 border-4 border-emerald-200 border-t-emerald-600 rounded-full animate-spin mb-3"></div>
-                      <p className="text-xs font-black text-emerald-700 uppercase tracking-widest">Uploading Document...</p>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="w-12 h-12 bg-white rounded-xl shadow-sm flex items-center justify-center text-emerald-600 mb-3">
-                        <Upload size={24} />
-                      </div>
-                      <p className="text-sm font-black text-gray-900 mb-1">Click to upload document</p>
-                      <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">PDF, JPG or PNG (Max 5MB)</p>
-                    </>
-                  )}
+          {status === 'pending' ? (
+            <div className="space-y-6">
+              <div className="space-y-3">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Identity Details</label>
+                <div className="flex gap-2 mb-2">
+                  {['gst', 'pan', 'aadhaar'].map(type => (
+                    <button 
+                      key={type}
+                      onClick={() => setTaxType(type)}
+                      className={`flex-1 py-2 text-[10px] font-black uppercase rounded-xl transition-all border ${taxType === type ? 'bg-gray-900 text-white border-gray-900' : 'bg-gray-50 text-gray-400 border-gray-100 hover:border-gray-200'}`}
+                    >
+                      {type}
+                    </button>
+                  ))}
                 </div>
-                <input type="file" className="hidden" accept=".pdf,image/*" onChange={handleFileUpload} disabled={uploading} />
-              </label>
-            ) : (
-              <div className="bg-emerald-500 rounded-3xl p-6 text-white text-center animate-[scaleIn_0.3s_ease-out]">
-                <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <CheckCircle2 size={28} />
-                </div>
-                <h3 className="font-black text-lg mb-1">Document Uploaded!</h3>
-                <p className="text-emerald-50 text-xs font-bold">Our team will verify your business details within 24 hours.</p>
-                <div className="mt-4 flex items-center justify-center gap-2 bg-black/10 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest">
-                  <FileUp size={14} />
-                  View Uploaded File
+                <div className="relative group">
+                  <CreditCard className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-emerald-600" size={18} />
+                  <input 
+                    type="text"
+                    value={taxId}
+                    onChange={(e) => setTaxId(e.target.value)}
+                    placeholder={`Enter ${taxType.toUpperCase()} Number`}
+                    className="w-full pl-12 pr-4 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl outline-none font-bold text-sm"
+                  />
                 </div>
               </div>
-            )}
-            
-            {error && (
-              <div className="mt-4 flex items-center gap-2 text-red-600 bg-red-50 p-3 rounded-xl border border-red-100 animate-shake">
-                <AlertCircle size={16} />
-                <p className="text-xs font-bold">{error}</p>
-              </div>
-            )}
-          </div>
 
-          {/* Status Steps */}
-          <div className="space-y-3 mb-8 opacity-60">
-            <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 flex items-center gap-4">
-              <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${status !== 'pending' ? 'bg-emerald-500 text-white' : 'bg-white text-gray-400 border border-gray-100'}`}>
-                <FileText size={20} />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Business License</label>
+                  <label className={`relative flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-3xl cursor-pointer transition-all ${docUrl ? 'bg-emerald-50 border-emerald-200' : 'bg-gray-50 border-gray-100'}`}>
+                    {uploading.doc ? <div className="w-6 h-6 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin"></div> : docUrl ? <CheckCircle2 className="text-emerald-600" /> : <FileUp className="text-gray-400" />}
+                    <input type="file" className="hidden" accept=".pdf,image/*" onChange={(e) => handleFileUpload(e, 'doc')} />
+                  </label>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Store Picture</label>
+                  <label className={`relative flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-3xl cursor-pointer transition-all ${storePicUrl ? 'bg-emerald-50 border-emerald-200' : 'bg-gray-50 border-gray-100'}`}>
+                    {uploading.store ? <div className="w-6 h-6 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin"></div> : storePicUrl ? <img src={storePicUrl} className="w-full h-full object-cover rounded-2xl" /> : <Camera className="text-gray-400" />}
+                    <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, 'store')} />
+                  </label>
+                </div>
               </div>
-              <div className="flex-grow">
-                <h3 className="font-bold text-gray-900 text-sm leading-none mb-1">Document Upload</h3>
-                <p className={`text-[10px] font-black uppercase tracking-wider ${status !== 'pending' ? 'text-emerald-600' : 'text-gray-400'}`}>
-                  {status !== 'pending' ? 'Completed' : 'Awaiting Action'}
-                </p>
-              </div>
-              {status !== 'pending' && <CheckCircle2 size={20} className="text-emerald-500" />}
+
+              {error && (
+                <div className="p-4 bg-red-50 border border-red-100 text-red-600 text-[10px] font-black rounded-2xl flex flex-col gap-1">
+                   <div className="flex items-center gap-2 uppercase tracking-widest text-[10px] font-black"><AlertCircle size={14} /> Upload Error</div>
+                   {error}
+                </div>
+              )}
+
+              <button 
+                onClick={handleSubmit}
+                disabled={uploading.submitting || uploading.doc || uploading.store}
+                className="w-full bg-[#107569] hover:bg-[#0d6359] text-white font-black py-4 rounded-2xl shadow-xl shadow-[#107569]/20 transition-all flex items-center justify-center gap-2"
+              >
+                {uploading.submitting ? 'Finalizing...' : 'Submit Verification'}
+                <ArrowRight size={18} />
+              </button>
             </div>
-
-            <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 flex items-center gap-4">
-              <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center text-gray-300 border border-gray-100 shrink-0">
-                <ShieldCheck size={20} />
+          ) : (
+            <div className="text-center py-10 animate-[scaleIn_0.3s_ease-out]">
+              <div className="w-20 h-20 bg-emerald-500 text-white rounded-full flex items-center justify-center mx-auto mb-6 shadow-2xl shadow-emerald-500/30">
+                <CheckCircle2 size={40} />
               </div>
-              <div className="flex-grow">
-                <h3 className="font-bold text-gray-900 text-sm leading-none mb-1">Admin Verification</h3>
-                <p className="text-gray-400 text-[10px] font-bold uppercase tracking-wider">Pending Review</p>
-              </div>
+              <h2 className="text-2xl font-black text-gray-900 mb-2">Success!</h2>
+              <p className="text-gray-500 font-medium mb-8">Verification documents uploaded to Hostinger.</p>
+              <button onClick={onSkip} className="w-full bg-gray-900 text-white font-black py-4 rounded-2xl">Browse Now</button>
             </div>
-          </div>
-
-          {/* Actions */}
-          <div className="flex flex-col gap-3">
-            <button 
-              onClick={onSkip}
-              className="w-full bg-[#107569] hover:bg-[#0d6359] text-white font-bold py-3.5 rounded-xl shadow-lg shadow-[#107569]/20 transform hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2 group text-sm"
-            >
-              Continue to Store
-              <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
-            </button>
-            <button 
-              onClick={onBack}
-              className="w-full py-2 text-gray-400 font-bold hover:text-gray-600 transition-colors text-xs"
-            >
-              Cancel and Return
-            </button>
-          </div>
+          )}
         </div>
       </div>
     </div>
