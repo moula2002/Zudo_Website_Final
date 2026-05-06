@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Package, Calendar, Clock, ChevronRight, ShoppingBag, ArrowLeft, CheckCircle2, Truck, AlertCircle, MapPin, Receipt, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react';
-import { API_URL, API_BASE_URL } from '../config';
+import { API_URL, API_BASE_URL, IMAGE_BASE_URL } from '../config';
 
 export default function OrdersPage({ onNavigate }) {
   const [orders, setOrders] = useState([]);
@@ -31,22 +31,57 @@ export default function OrdersPage({ onNavigate }) {
     fetchOrders();
   }, []);
 
+  const updateOrderStatus = async (orderId, newStatus) => {
+    try {
+      const response = await fetch(`${API_URL}/orders/${orderId}/status`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ status: newStatus })
+      });
+
+      if (response.ok) {
+        // Refresh orders after update
+        const updatedOrders = orders.map(order => 
+          order._id === orderId ? { ...order, orderStatus: newStatus } : order
+        );
+        setOrders(updatedOrders);
+      }
+    } catch (err) {
+      console.error('Failed to update order status:', err);
+    }
+  };
+
+  const canReturn = (order) => {
+    if (order.orderStatus !== 'Delivered') return false;
+    const deliveredDate = new Date(order.updatedAt || order.createdAt);
+    const today = new Date();
+    const diffTime = Math.abs(today - deliveredDate);
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays <= 3;
+  };
+
   const getStatusStyle = (status) => {
     switch (status) {
       case 'Delivered': return 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20';
+      case 'Returned': return 'bg-purple-500 text-white shadow-lg shadow-purple-500/20';
       case 'Shipped': return 'bg-blue-500 text-white shadow-lg shadow-blue-500/20';
       case 'Processing': return 'bg-amber-500 text-white shadow-lg shadow-amber-500/20';
+      case 'Pending': return 'bg-gray-500 text-white shadow-lg shadow-gray-500/20';
       case 'Cancelled': return 'bg-red-500 text-white shadow-lg shadow-red-500/20';
-      default: return 'bg-gray-500 text-white shadow-lg shadow-gray-500/20';
+      default: return 'bg-gray-400 text-white shadow-lg shadow-gray-400/20';
     }
   };
 
   const getStatusIcon = (status) => {
     switch (status) {
       case 'Delivered': return <CheckCircle2 size={14} />;
+      case 'Returned': return <ArrowLeft size={14} />;
       case 'Shipped': return <Truck size={14} />;
       case 'Processing': return <Clock size={14} />;
-      case 'Cancelled': return <AlertCircle size={14} />;
+      case 'Cancelled': return <X size={14} />;
       default: return <Package size={14} />;
     }
   };
@@ -54,7 +89,7 @@ export default function OrdersPage({ onNavigate }) {
   const formatImageUrl = (url) => {
     if (!url) return 'https://via.placeholder.com/150';
     if (url.startsWith('http')) return url;
-    return `${uploadBase}${url.startsWith('/') ? '' : '/'}${url}`;
+    return `${IMAGE_BASE_URL}${url.startsWith('/') ? '' : '/'}${url}`;
   };
 
   if (loading) {
@@ -222,6 +257,27 @@ export default function OrdersPage({ onNavigate }) {
                             <div className="flex justify-between items-center">
                               <span className="text-gray-900 font-black">Total Paid</span>
                               <span className="text-xl font-black text-emerald-600">₹{order.totalAmount}</span>
+                            </div>
+                            
+                            {/* Order Actions */}
+                            <div className="pt-4 border-t border-gray-50 flex flex-col gap-2">
+                              {order.orderStatus === 'Pending' && (
+                                <button 
+                                  onClick={() => updateOrderStatus(order._id, 'Cancelled')}
+                                  className="w-full py-3 bg-red-50 text-red-600 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all"
+                                >
+                                  Cancel Order
+                                </button>
+                              )}
+                              
+                              {order.orderStatus === 'Delivered' && canReturn(order) && (
+                                <button 
+                                  onClick={() => updateOrderStatus(order._id, 'Returned')}
+                                  className="w-full py-3 bg-amber-50 text-amber-700 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-amber-600 hover:text-white transition-all"
+                                >
+                                  Return Order (3 Days Left)
+                                </button>
+                              )}
                             </div>
                           </div>
                         </div>

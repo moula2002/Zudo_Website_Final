@@ -6,7 +6,7 @@ const userSchema = new mongoose.Schema({
   email: { type: String, required: true },
   phone: { type: String },
   password: { type: String, required: true },
-  role: { type: String, enum: ['b2c', 'b2b'], default: 'b2c' },
+  role: { type: String, enum: ['b2c', 'b2b', 'seller'], default: 'b2c' },
   profilePicture: { type: String },
   // B2B specific fields
   businessName: { type: String },

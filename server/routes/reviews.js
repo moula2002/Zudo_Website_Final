@@ -8,6 +8,13 @@ const { protect } = require('../middleware/auth');
 router.post('/', protect, async (req, res) => {
   try {
     const { productId, rating, comment, media } = req.body;
+
+    // Check if user already reviewed this product
+    const existingReview = await Review.findOne({ userId: req.user._id, productId });
+    if (existingReview) {
+      return res.status(400).json({ message: 'You have already reviewed this product' });
+    }
+
     const review = await Review.create({
       userId: req.user._id,
       productId,

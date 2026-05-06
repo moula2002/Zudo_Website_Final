@@ -19,7 +19,7 @@ export default function B2BVerificationScreen({ onSkip, onBack, user, onUpdateUs
 
     setUploading(prev => ({ ...prev, [type]: true }));
     setError('');
-    
+
     const formData = new FormData();
     formData.append('file', file);
 
@@ -39,7 +39,7 @@ export default function B2BVerificationScreen({ onSkip, onBack, user, onUpdateUs
 
       if (type === 'doc') setDocUrl(savedUrl);
       else setStorePicUrl(savedUrl);
-      
+
     } catch (err) {
       console.error('Upload error:', err);
       setError('Upload failed: ' + err.message);
@@ -88,13 +88,13 @@ export default function B2BVerificationScreen({ onSkip, onBack, user, onUpdateUs
 
       localStorage.setItem('user', JSON.stringify(data));
       if (onUpdateUser) onUpdateUser(data);
-      
+
       setStatus('uploaded');
-      
+
       setTimeout(() => {
         onSkip();
       }, 2000);
-      
+
     } catch (err) {
       console.error('SUBMIT ERROR:', err);
       setError(err.message);
@@ -125,7 +125,7 @@ export default function B2BVerificationScreen({ onSkip, onBack, user, onUpdateUs
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Identity Details</label>
                 <div className="flex gap-2 mb-2">
                   {['gst', 'pan', 'aadhaar'].map(type => (
-                    <button 
+                    <button
                       key={type}
                       onClick={() => setTaxType(type)}
                       className={`flex-1 py-2 text-[10px] font-black uppercase rounded-xl transition-all border ${taxType === type ? 'bg-gray-900 text-white border-gray-900' : 'bg-gray-50 text-gray-400 border-gray-100 hover:border-gray-200'}`}
@@ -136,7 +136,7 @@ export default function B2BVerificationScreen({ onSkip, onBack, user, onUpdateUs
                 </div>
                 <div className="relative group">
                   <CreditCard className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-emerald-600" size={18} />
-                  <input 
+                  <input
                     type="text"
                     value={taxId}
                     onChange={(e) => setTaxId(e.target.value)}
@@ -166,12 +166,12 @@ export default function B2BVerificationScreen({ onSkip, onBack, user, onUpdateUs
 
               {error && (
                 <div className="p-4 bg-red-50 border border-red-100 text-red-600 text-[10px] font-black rounded-2xl flex flex-col gap-1">
-                   <div className="flex items-center gap-2 uppercase tracking-widest text-[10px] font-black"><AlertCircle size={14} /> Upload Error</div>
-                   {error}
+                  <div className="flex items-center gap-2 uppercase tracking-widest text-[10px] font-black"><AlertCircle size={14} /> Upload Error</div>
+                  {error}
                 </div>
               )}
 
-              <button 
+              <button
                 onClick={handleSubmit}
                 disabled={uploading.submitting || uploading.doc || uploading.store}
                 className="w-full bg-[#107569] hover:bg-[#0d6359] text-white font-black py-4 rounded-2xl shadow-xl shadow-[#107569]/20 transition-all flex items-center justify-center gap-2"

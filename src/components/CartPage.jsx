@@ -1,7 +1,7 @@
 import React from 'react';
 import { Trash2, ArrowLeft, ShoppingBag, CreditCard, ChevronRight, ShieldCheck, Clock } from 'lucide-react';
 
-export default function CartPage({ cartItems, onUpdateQuantity, onRemove, onNavigate }) {
+export default function CartPage({ cartItems, onUpdateQuantity, onRemove, onNavigate, isB2B }) {
   const user = JSON.parse(localStorage.getItem('user') || 'null');
   const isB2BPending = user?.role === 'b2b' && !user.isVerified;
 
@@ -90,7 +90,17 @@ export default function CartPage({ cartItems, onUpdateQuantity, onRemove, onNavi
                     </div>
                     
                     <div className="flex-grow">
-                      <h3 className="text-lg font-black text-gray-900 mb-1 leading-tight">{item.name}</h3>
+                      <h3 className="text-lg font-black text-gray-900 mb-0.5 leading-tight">{item.name}</h3>
+                      {isB2B && (
+                        <div className="flex items-center gap-1.5 mb-2">
+                          <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Seller:</span>
+                          <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100/50">
+                            {item.sellerName && item.sellerName !== 'Zudo Official' 
+                              ? item.sellerName 
+                              : (item.sellerId?.businessName || item.sellerId?.name || item.sellerName || 'Zudo Official')}
+                          </span>
+                        </div>
+                      )}
                       <div className="text-emerald-600 font-black text-xl tracking-tighter">{item.price}</div>
                     </div>
 

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { IMAGE_BASE_URL } from '../config';
 import ProductCard from './ProductCard';
 import { Filter } from 'lucide-react';
 
@@ -113,7 +114,7 @@ export default function ProductsPage({ searchQuery, initialCategory = 'All', ini
                     className={`flex-shrink-0 group flex items-center gap-3 px-4 py-2 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all duration-300 border ${subcategory === sub.name ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-600/30 scale-105' : 'bg-white border-gray-100 text-gray-500 hover:border-emerald-200 hover:bg-emerald-50/30'}`}
                   >
                     <div className={`w-6 h-6 rounded-lg overflow-hidden border transition-all ${subcategory === sub.name ? 'border-white/40' : 'border-gray-100 group-hover:border-emerald-200'}`}>
-                      <img src={sub.img} alt={sub.name} className="w-full h-full object-cover" />
+                      <img src={sub.img?.startsWith('http') ? sub.img : `${IMAGE_BASE_URL}${sub.img}`} alt={sub.name} className="w-full h-full object-cover" />
                     </div>
                     <span>{sub.name}</span>
                   </button>

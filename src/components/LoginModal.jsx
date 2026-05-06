@@ -216,7 +216,7 @@ export default function LoginModal({ onClose, setUser, initialB2B = null }) {
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="bg-white rounded-3xl w-full max-w-3xl flex overflow-hidden shadow-2xl relative animate-[fadeIn_0.3s_ease-out]">
+      <div className="bg-white rounded-3xl w-full max-w-md flex overflow-hidden shadow-2xl relative animate-[fadeIn_0.3s_ease-out]">
         <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-black transition-all z-[110] bg-gray-50 p-1.5 rounded-full">
           <X size={18} />
         </button>
@@ -246,23 +246,18 @@ export default function LoginModal({ onClose, setUser, initialB2B = null }) {
              </div>
           </div>
         ) : (
-          <>
-            <div className="w-2/5 hidden md:block relative bg-gray-100 overflow-hidden">
-              <img src={isB2B ? "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&q=80&w=800" : "https://images.unsplash.com/photo-1542831371-29b0f74f9713?auto=format&fit=crop&q=80&w=800"} alt="Groceries" className="absolute inset-0 w-full h-full object-cover" />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex flex-col justify-end p-8">
-                <h3 className="text-white text-2xl font-black mb-2">{isB2B ? 'Zudo B2B Solutions.' : 'Premium Groceries.'}</h3>
-                <p className="text-white/70 font-bold text-xs">{isB2B ? 'Wholesale rates for your business.' : 'Quality you can trust.'}</p>
+          <div className="w-full p-8 md:p-12 relative bg-white flex flex-col justify-center max-h-[90vh] overflow-y-auto">
+            <div className="mb-8 text-center">
+              <button onClick={() => { setSelection(null); setIsB2B(false); }} className="mx-auto flex items-center gap-2 text-emerald-600 font-black text-[9px] uppercase tracking-widest mb-6 hover:translate-x-[-2px] transition-transform w-fit"><ArrowLeft size={12} strokeWidth={3} />Change Account Type</button>
+              
+              <div className="w-16 h-16 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600 mx-auto mb-4">
+                {isB2B ? <Building2 size={32} /> : <ShoppingBag size={32} />}
               </div>
+              
+              <h2 className="text-3xl font-black text-gray-900 tracking-tight mb-1">Welcome to Zudo</h2>
+              <p className="text-emerald-600 font-black text-[10px] uppercase tracking-[0.2em]">buy more enjoy more</p>
+              {isB2B && <span className="inline-block mt-3 bg-gray-900 text-white text-[8px] font-black px-3 py-1 rounded-full uppercase tracking-widest">B2B Portal</span>}
             </div>
-
-            <div className="w-full md:w-3/5 p-8 relative bg-white flex flex-col justify-center max-h-[90vh] overflow-y-auto">
-              <div className="mb-6">
-                <button onClick={() => { setSelection(null); setIsB2B(false); }} className="flex items-center gap-2 text-emerald-600 font-black text-[9px] uppercase tracking-widest mb-4 hover:translate-x-[-2px] transition-transform"><ArrowLeft size={12} strokeWidth={3} />Change Account Type</button>
-                <div className="flex items-center gap-2 mb-1">
-                  <h2 className="text-2xl font-black text-gray-900 tracking-tight">{isLogin ? 'Welcome Back' : 'Get Started'}</h2>
-                  {isB2B && <span className="bg-gray-900 text-white text-[8px] font-black px-2 py-0.5 rounded uppercase">B2B</span>}
-                </div>
-              </div>
 
               {error && <div className="mb-4 p-3 bg-red-50 border border-red-100 text-red-600 text-[10px] font-black rounded-xl">{error}</div>}
 
@@ -321,7 +316,6 @@ export default function LoginModal({ onClose, setUser, initialB2B = null }) {
                 <p className="text-gray-400 font-bold text-[10px]">{isLogin ? "New here? " : "Joined already? "}<button onClick={() => setIsLogin(!isLogin)} className="text-emerald-600 font-black uppercase tracking-widest ml-1 hover:underline">{isLogin ? 'Sign Up' : 'Sign In'}</button></p>
               </div>
             </div>
-          </>
         )}
       </div>
     </div>

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Heart, Plus, Minus, Star, Clock } from 'lucide-react';
+import { IMAGE_BASE_URL } from '../config';
 
 export default function ProductCard({ product, onAddToCart, onUpdateQuantity, onToggleWishlist, isWishlisted, quantity = 0 }) {
   const isPending = product.price === 'Verification Pending';
@@ -26,7 +27,7 @@ export default function ProductCard({ product, onAddToCart, onUpdateQuantity, on
         
         { (product.image || product.imageUrl) ? (
           <img 
-            src={product.image || product.imageUrl} 
+            src={(product.image || product.imageUrl)?.startsWith('http') ? (product.image || product.imageUrl) : `${IMAGE_BASE_URL}${product.image || product.imageUrl}`} 
             alt={product.name} 
             className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-1000 ease-out"
           />
@@ -97,6 +98,16 @@ export default function ProductCard({ product, onAddToCart, onUpdateQuantity, on
           {product.name}
         </h3>
         
+        {product.isB2B && (
+          <div className="flex items-center gap-1.5 mt-1.5">
+            <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Seller:</span>
+            <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100/50">
+              {product.sellerName && product.sellerName !== 'Zudo Official' ? product.sellerName : (product.sellerId?.businessName || product.sellerId?.name || 'Zudo Official')}
+            </span>
+            <span className="text-[8px] text-gray-400 font-medium">ID: {product.sellerId?._id || product.sellerId || 'N/A'}</span>
+          </div>
+        )}
+        
         <div className="mt-1 pt-3 border-t border-gray-50 flex items-center justify-between">
           <div className="flex flex-col">
             {!isPending && product.oldPrice && (
@@ -107,10 +118,10 @@ export default function ProductCard({ product, onAddToCart, onUpdateQuantity, on
                 {isPending && <Clock size={12} />}
                 {typeof product.price === 'number' ? `₹${product.price}` : (product.price?.startsWith('₹') ? product.price : (isPending ? product.price : `₹${product.price}`))}
               </span>
-              {!isPending && product.isB2B && (
+              {product.isB2B && (
                 <div className="flex items-center gap-1.5 mt-1">
                   <span className="text-[8px] font-black bg-gray-900 text-white px-1.5 py-0.5 rounded uppercase tracking-tighter">B2B</span>
-                  <span className="text-[8px] font-bold text-gray-900 bg-gray-50 px-1.5 py-0.5 rounded border border-gray-100 uppercase tracking-tighter">Min Qty: 4</span>
+                  <span className="text-[8px] font-bold text-gray-900 bg-gray-50 px-1.5 py-0.5 rounded border border-gray-100 uppercase tracking-tighter">Min Qty: {product.moq || 1}</span>
                 </div>
               )}
               {isPending && (

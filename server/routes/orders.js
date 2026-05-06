@@ -89,16 +89,41 @@ router.get('/admin/all', protect, async (req, res) => {
 
 // @route   PUT /api/orders/:id/status
 // @desc    Update order status
+// @access  Private
 router.put('/:id/status', protect, async (req, res) => {
   try {
-    const order = await Order.findById(req.params.id);
-    if (!order) return res.status(404).json({ message: 'Order not found' });
+    const { status } = req.body;
     
-    order.orderStatus = req.body.status;
+    if (!status) {
+      return res.status(400).json({ message: 'Status is required' });
+    }
+
+    const order = await Order.findById(req.params.id);
+    if (!order) {
+      return res.status(404).json({ message: 'Order not found' });
+    }
+    
+    // Authorization check: User can only cancel their own order
+    if (order.userId.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Not authorized to update this order' });
+    }
+
+    order.orderStatus = status;
+    
+    // If cancelled, also update payment status if it was COD
+    if (status === 'Cancelled' && order.paymentMethod === 'COD') {
+      order.paymentStatus = 'Cancelled';
+    }
+
     await order.save();
     res.json(order);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error('Order status update error:', error);
+    res.status(500).json({ 
+      message: 'Failed to update order status', 
+      error: error.message,
+      details: error.errors ? Object.values(error.errors).map(err => err.message) : []
+    });
   }
 });
 

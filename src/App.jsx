@@ -39,6 +39,7 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [isB2B, setIsB2B] = useState(false);
   const [b2bStatus, setB2bStatus] = useState('none');
+  const [connectionError, setConnectionError] = useState(false);
 
   // Load user from storage immediately
   const loadUserFromStorage = () => {
@@ -93,7 +94,16 @@ function App() {
           fetch(`${API_URL}/products`),
           fetch(`${API_URL}/categories`),
           fetch(`${API_URL}/subcategories`)
-        ]).catch(() => [null, null, null]);
+        ]).catch((e) => {
+          setConnectionError(true);
+          return [null, null, null];
+        });
+
+        if (!prodRes || !prodRes.ok) {
+          setConnectionError(true);
+        } else {
+          setConnectionError(false);
+        }
 
         const prodData = prodRes && prodRes.ok ? await prodRes.json() : [];
         const catData = catRes && catRes.ok ? await catRes.json() : [];
@@ -125,6 +135,7 @@ function App() {
             ...p,
             id: p._id || p.id,
             image: p.imageUrl || p.image,
+            sellerName: p.sellerName || p.sellerId?.businessName || p.sellerId?.name || 'Zudo Official',
             category: foundCat ? foundCat.name : (p.categoryId?.name || p.category?.name || 'All'),
             subcategory: foundSub ? foundSub.name : (p.subCategoryId?.name || p.subcategory?.name || 'All')
           };
@@ -150,21 +161,20 @@ function App() {
   };
 
   useEffect(() => {
-    if (user?.role === 'business' || user?.role === 'b2b') {
+    const isBusiness = user?.role === 'business' || user?.role === 'b2b' || user?.role === 'seller';
+    setIsB2B(isBusiness);
+
+    if (isBusiness) {
       const hasDocs = user.gstPdf || user.storePic || user.businessName;
       if (user.isVerified) {
         setB2bStatus('approved');
-        setIsB2B(true);
       } else if (!hasDocs) {
         setB2bStatus('pending');
-        setIsB2B(false);
       } else {
         setB2bStatus('none');
-        setIsB2B(false);
       }
     } else {
       setB2bStatus('none');
-      setIsB2B(false);
     }
   }, [user]);
 
@@ -178,7 +188,7 @@ function App() {
   };
 
   const addToCart = (product) => {
-    const initialQty = isB2B ? 4 : 1;
+    const initialQty = isB2B ? (product.moq || 4) : 1;
     setCartItems(prev => {
       const existing = prev.find(item => item.id === product.id);
       if (existing) {
@@ -223,14 +233,24 @@ function App() {
   const navigateToProduct = (product) => { setSelectedProduct(product); setCurrentPage('productDetails'); };
 
   const getDisplayPrice = (product) => {
-    if ((user?.role === 'business' || user?.role === 'b2b') && !user.isVerified) {
+    const isUserB2B = user?.role === 'business' || user?.role === 'b2b';
+    if (isUserB2B && !user.isVerified) {
        return { price: "Verification Pending", oldPrice: null, isB2B: true };
     }
-    return { price: `₹${product.price}`, oldPrice: product.oldPrice };
+    return { 
+      price: isUserB2B ? `₹${product.b2bPrice || product.price}` : `₹${product.price}`, 
+      oldPrice: product.oldPrice,
+      isB2B: isUserB2B 
+    };
   };
 
   return (
     <div className="min-h-screen bg-[#f8f9fa] text-gray-900 font-sans overflow-x-hidden relative flex flex-col">
+      {connectionError && (
+        <div className="fixed top-0 left-0 right-0 z-[9999] bg-red-600 text-white text-center py-3 font-black text-xs uppercase tracking-widest animate-pulse shadow-lg">
+          ⚠️ BACKEND CONNECTION FAILED (Localhost:5000)
+        </div>
+      )}
       <Navbar 
         cartCount={cartItems.length} 
         wishlistCount={wishlistItems.length}
@@ -316,10 +336,13 @@ function App() {
                 cartItems={cartItems}
                 onUpdateQuantity={updateCartQuantity}
                 allProducts={allProducts}
+                isB2B={isB2B}
+                getDisplayPrice={getDisplayPrice}
+                user={user}
               />
             )}
 
-            {currentPage === 'cart' && <CartPage cartItems={cartItems} onUpdateQuantity={updateCartQuantity} onRemove={removeFromCart} onNavigate={setCurrentPage} />}
+            {currentPage === 'cart' && <CartPage cartItems={cartItems} onUpdateQuantity={updateCartQuantity} onRemove={removeFromCart} onNavigate={setCurrentPage} isB2B={isB2B} />}
             {currentPage === 'wishlist' && <WishlistPage wishlistItems={wishlistItems} cartItems={cartItems} onAddToCart={addToCart} onUpdateQuantity={updateCartQuantity} onToggleWishlist={toggleWishlist} onNavigate={setCurrentPage} onNavigateToProduct={navigateToProduct} />}
             {currentPage === 'checkout' && <CheckoutPage cartItems={cartItems} user={user} onNavigate={setCurrentPage} onOrderSuccess={() => { setCartItems([]); showToast('Order placed!'); setCurrentPage('home'); }} />}
             {currentPage === 'profile' && <ProfilePage user={user} onUpdateUser={setUser} onNavigate={handleNavigate} initialTab={profileTab} />}

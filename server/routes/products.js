@@ -7,6 +7,7 @@ const fs = require('fs');
 const Product = require('../models/Product');
 const Category = require('../models/Category');
 const SubCategory = require('../models/SubCategory');
+const Seller = require('../models/Seller');
 const { protect } = require('../middleware/auth');
 
 // Configure Multer for persistent storage
@@ -36,12 +37,36 @@ const upload = multer({
   }
 });
 
-// @route   GET /api/products
-// @desc    Get all products
 router.get('/', async (req, res) => {
   try {
     const products = await Product.find().populate('categoryId').populate('subCategoryId');
-    res.json(products);
+    
+    // Manually fetch seller names to be 100% sure
+    const productsWithSellers = await Promise.all(products.map(async (product) => {
+      const p = product.toObject();
+      if (p.sellerId) {
+        // Try Mongoose first
+        let seller = await Seller.findById(p.sellerId);
+        
+        // Fallback to direct DB query if Mongoose fails
+        if (!seller) {
+          const db = mongoose.connection.db;
+          seller = await db.collection('sellers').findOne({ 
+            _id: p.sellerId instanceof mongoose.Types.ObjectId ? p.sellerId : new mongoose.Types.ObjectId(p.sellerId) 
+          });
+        }
+
+        if (seller) {
+          p.sellerName = seller.businessName || seller.name;
+          p.sellerId = seller; 
+        } else {
+          p.sellerName = "Zudo Official";
+        }
+      }
+      return p;
+    }));
+
+    res.json(productsWithSellers);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -73,6 +98,8 @@ router.post('/', protect, upload.fields([{ name: 'image', maxCount: 1 }, { name:
       unit,
       imageUrl,
       pdfUrl,
+      sellerId: req.body.sellerId || null,
+      sellerName: req.body.sellerName || 'Zudo Official',
       rating: 0
     });
 

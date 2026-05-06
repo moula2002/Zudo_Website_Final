@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ShoppingCart, ChevronDown, Menu, Heart, Search, X, Wheat, Leaf, ShoppingBag, Package, Coffee, LogOut, Settings, UserCircle, Home, LayoutGrid, PhoneCall, MapPin, Clock } from 'lucide-react';
 import { useLocation } from '../hooks/useLocation';
+import { IMAGE_BASE_URL } from '../config';
 
 export default function Navbar({ cartCount = 0, wishlistCount = 0, onLoginClick, onNavigate, onSearch, onCategoryClick, onNavigateToProduct, currentPage = 'home', isB2B = false, onLogout, user, categories = [], subcategories = [], allProducts = [] }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -32,7 +33,7 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, onLoginClick,
       items: catSubs.map(sub => ({
         name: sub.name,
         sub: sub.name,
-        img: sub.image || 'https://images.unsplash.com/photo-1542831371-29b0f74f9713?auto=format&fit=crop&q=80&w=200'
+        img: sub.image?.startsWith('http') ? sub.image : (sub.image ? `${IMAGE_BASE_URL}${sub.image}` : 'https://images.unsplash.com/photo-1542831371-29b0f74f9713?auto=format&fit=crop&q=80&w=200')
       }))
     };
     return acc;

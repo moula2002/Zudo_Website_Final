@@ -9,7 +9,8 @@ const productSchema = new mongoose.Schema({
   moq: { type: Number, default: 1 },
   unit: { type: String, required: true },
   imageUrl: { type: String },
-  sellerId:{type:String},
+  sellerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Seller' },
+  sellerName:{type:String, default: 'Zudo Official'},
   description:{ type: String },
   pdfUrl: { type: String },
   rating: { type: Number, default: 0 }

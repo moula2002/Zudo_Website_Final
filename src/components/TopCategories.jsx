@@ -1,4 +1,5 @@
 import React from 'react';
+import { IMAGE_BASE_URL } from '../config';
 
 const defaultImages = {
   'Pulses': 'https://static.toiimg.com/photo/82196489.cms',
@@ -67,7 +68,7 @@ export default function TopCategories({ onNavigate, onCategoryClick, categories 
               {/* Main Circular Image */}
               <div className="absolute inset-0 bg-white rounded-full border-2 border-white shadow-md overflow-hidden group-hover:shadow-xl group-hover:shadow-emerald-500/10 transition-all duration-500">
                 <img 
-                  src={cat.image || cat.imageUrl || defaultImages[cat.name] || 'https://images.unsplash.com/photo-1542831371-29b0f74f9713?auto=format&fit=crop&q=80&w=500'} 
+                  src={(cat.image || cat.imageUrl)?.startsWith('http') ? (cat.image || cat.imageUrl) : (cat.image || cat.imageUrl ? `${IMAGE_BASE_URL}${cat.image || cat.imageUrl}` : (defaultImages[cat.name] || 'https://images.unsplash.com/photo-1542831371-29b0f74f9713?auto=format&fit=crop&q=80&w=500'))} 
                   alt={cat.name} 
                   className="w-full h-full object-cover transform group-hover:scale-110 transition-all duration-700 ease-out"
                 />
