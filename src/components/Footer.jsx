@@ -55,12 +55,12 @@ export default function Footer({ onNavigate }) {
           {/* Support */}
           <div>
             <h3 className="text-gray-900 font-bold text-lg mb-6">Support</h3>
-            <ul className="space-y-3">
-              <li><a href="#" className="hover:text-green-600 transition-colors">Terms & Conditions</a></li>
-              <li><a href="#" className="hover:text-green-600 transition-colors">FAQ</a></li>
-              <li><a href="#" className="hover:text-green-600 transition-colors">Privacy Policy</a></li>
-              <li><a href="#" className="hover:text-green-600 transition-colors">Returns & Refunds</a></li>
-              <li><a href="#" className="hover:text-green-600 transition-colors">Shipping Policy</a></li>
+            <ul className="space-y-3 text-sm">
+              <li><button onClick={() => onNavigate('terms')} className="hover:text-green-600 transition-colors">Terms & Conditions</button></li>
+              <li><button onClick={() => onNavigate('privacy')} className="hover:text-green-600 transition-colors">Privacy Policy</button></li>
+              <li><button onClick={() => onNavigate('returns')} className="hover:text-green-600 transition-colors">Returns & Refunds</button></li>
+              <li><button onClick={() => onNavigate('shipping')} className="hover:text-green-600 transition-colors">Shipping Policy</button></li>
+              <li><button onClick={() => onNavigate('contact')} className="hover:text-green-600 transition-colors">FAQ & Help</button></li>
             </ul>
           </div>
 

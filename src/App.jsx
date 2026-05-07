@@ -18,6 +18,7 @@ import B2BVerificationScreen from './components/B2BVerificationScreen';
 import CheckoutPage from './components/CheckoutPage';
 import ProfilePage from './components/ProfilePage';
 import OrdersPage from './components/OrdersPage';
+import PolicyPage from './components/PolicyPage';
 import { API_URL, API_BASE_URL } from './config';
 import './App.css';
 
@@ -348,6 +349,12 @@ function App() {
             {currentPage === 'profile' && <ProfilePage user={user} onUpdateUser={setUser} onNavigate={handleNavigate} initialTab={profileTab} />}
             {currentPage === 'orders' && <OrdersPage onNavigate={setCurrentPage} />}
             {currentPage === 'contact' && <ContactPage />}
+            
+            {/* Policy Pages */}
+            {currentPage === 'terms' && <PolicyPage type="terms" onNavigate={setCurrentPage} />}
+            {currentPage === 'privacy' && <PolicyPage type="privacy" onNavigate={setCurrentPage} />}
+            {currentPage === 'shipping' && <PolicyPage type="shipping" onNavigate={setCurrentPage} />}
+            {currentPage === 'returns' && <PolicyPage type="returns" onNavigate={setCurrentPage} />}
           </>
         )}
       </div>
