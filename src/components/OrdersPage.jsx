@@ -174,6 +174,12 @@ export default function OrdersPage({ onNavigate }) {
                             {getStatusIcon(order.orderStatus)}
                             {order.orderStatus}
                           </div>
+                          {order.deliveryOtp && order.orderStatus !== 'Delivered' && order.orderStatus !== 'Cancelled' && (
+                            <div className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-1.5 rounded-full text-[10px] font-black tracking-widest uppercase shadow-lg shadow-emerald-600/20">
+                              <Truck size={12} />
+                              Delivery OTP: <span className="font-mono text-xs tracking-[0.2em] ml-1">{order.deliveryOtp}</span>
+                            </div>
+                          )}
                         </div>
                         <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-gray-500 font-bold text-sm">
                           <div className="flex items-center gap-2 text-gray-900">

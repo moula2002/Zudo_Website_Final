@@ -43,6 +43,8 @@ router.post('/', protect, async (req, res) => {
       };
     }));
 
+    const deliveryOtp = Math.floor(1000 + Math.random() * 9000).toString();
+
     const order = new Order({
       userId: req.user._id,
       items: enrichedItems,
@@ -50,7 +52,8 @@ router.post('/', protect, async (req, res) => {
       shippingAddress,
       paymentMethod,
       paymentStatus: paymentMethod === 'COD' ? 'Pending' : 'Completed',
-      orderStatus: 'Pending'
+      orderStatus: 'Pending',
+      deliveryOtp
     });
 
     const createdOrder = await order.save();
@@ -124,6 +127,31 @@ router.put('/:id/status', protect, async (req, res) => {
       error: error.message,
       details: error.errors ? Object.values(error.errors).map(err => err.message) : []
     });
+  }
+});
+
+// @route   POST /api/orders/:id/delivery-otp
+// @desc    Generate/Regenerate delivery OTP
+// @access  Private (Admin only or system)
+router.post('/:id/delivery-otp', protect, async (req, res) => {
+  try {
+    const order = await Order.findById(req.params.id);
+    if (!order) {
+      return res.status(404).json({ message: 'Order not found' });
+    }
+
+    // Generate new 4-digit OTP
+    const newOtp = Math.floor(1000 + Math.random() * 9000).toString();
+    order.deliveryOtp = newOtp;
+    
+    await order.save();
+    res.json({ 
+      message: 'Delivery OTP updated successfully', 
+      deliveryOtp: newOtp 
+    });
+  } catch (error) {
+    console.error('OTP generation error:', error);
+    res.status(500).json({ message: error.message });
   }
 });
 

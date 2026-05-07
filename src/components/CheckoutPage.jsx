@@ -18,6 +18,7 @@ export default function CheckoutPage({ cartItems, onNavigate, user, onOrderSucce
   const [paymentMethod, setPaymentMethod] = useState('COD');
   const [loading, setLoading] = useState(false);
   const [orderComplete, setOrderComplete] = useState(false);
+  const [placedOrder, setPlacedOrder] = useState(null);
   const [showSaved, setShowSaved] = useState(false);
   const savedAddresses = user?.savedAddresses || [];
 
@@ -82,6 +83,7 @@ export default function CheckoutPage({ cartItems, onNavigate, user, onOrderSucce
         // For demo, we just proceed to success
         handleRazorpayPayment(data);
       } else {
+        setPlacedOrder(data);
         setOrderComplete(true);
         if (onOrderSuccess) onOrderSuccess();
       }
@@ -111,6 +113,7 @@ export default function CheckoutPage({ cartItems, onNavigate, user, onOrderSucce
           body: JSON.stringify(response)
         });
         if (verifyResponse.ok) {
+          setPlacedOrder(order); // 'order' is passed as argument to handleRazorpayPayment
           setOrderComplete(true);
           if (onOrderSuccess) onOrderSuccess();
         }
@@ -134,11 +137,22 @@ export default function CheckoutPage({ cartItems, onNavigate, user, onOrderSucce
         </div>
         <h2 className="text-3xl font-black text-gray-900 mb-2">Order Placed Successfully!</h2>
         <p className="text-gray-500 max-w-md mb-8">Thank you for shopping with Zudo. Your fresh groceries will be delivered shortly.</p>
+        
+        {placedOrder?.deliveryOtp && (
+          <div className="mb-10 bg-[#107569] text-white p-8 rounded-[2.5rem] shadow-2xl shadow-emerald-900/20 relative overflow-hidden group max-w-sm w-full">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl"></div>
+            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-emerald-200 mb-3">Your Delivery OTP</p>
+            <p className="text-5xl font-black tracking-[0.5em] font-mono mb-4">{placedOrder.deliveryOtp}</p>
+            <p className="text-[10px] font-bold text-emerald-100/60 leading-tight">Please keep this code safe. You'll need to share it with the delivery partner at the time of collection.</p>
+          </div>
+        )}
+
         <button 
           onClick={() => onNavigate('home')}
-          className="px-8 py-3 bg-emerald-600 text-white font-bold rounded-xl shadow-lg shadow-emerald-600/30 hover:bg-emerald-700 transition-all transform hover:-translate-y-1"
+          className="px-10 py-4 bg-gray-900 text-white font-black rounded-2xl shadow-xl shadow-gray-900/20 hover:bg-black transition-all transform hover:-translate-y-1 active:scale-95 flex items-center gap-3"
         >
           Continue Shopping
+          <ChevronRight size={20} />
         </button>
       </div>
     );
