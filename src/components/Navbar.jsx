@@ -159,7 +159,7 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, onLoginClick,
               </div>
             ) : (
               <div className="w-full max-w-2xl relative animate-[fadeIn_0.3s_ease-out] flex items-center h-full">
-                <div className="fixed inset-0 z-40" onClick={() => setIsSearchOpen(false)}></div>
+                <div className="fixed inset-0 z-40 cursor-pointer" onClick={() => setIsSearchOpen(false)}></div>
                 <div className="w-full relative z-50">
                   <form onSubmit={handleSearchSubmit} className="relative w-full">
                     <Search size={18} className="absolute left-6 top-1/2 -translate-y-1/2 text-emerald-600" />
@@ -328,13 +328,17 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, onLoginClick,
                   {suggestions.length > 0 ? (
                     <div className="divide-y divide-gray-50">
                       {suggestions.map(prod => (
-                        <div key={prod.id} onClick={() => handleSuggestionClick(prod)} className="flex items-center gap-4 p-4 active:bg-emerald-50 transition-colors">
+                        <button 
+                          key={prod.id} 
+                          onClick={() => handleSuggestionClick(prod)} 
+                          className="w-full flex items-center gap-4 p-4 active:bg-emerald-50 transition-colors cursor-pointer text-left"
+                        >
                           <img src={prod.image} alt={prod.name} className="w-14 h-14 rounded-xl object-cover border border-gray-100" />
                           <div className="flex-1">
                             <div className="text-sm font-black text-gray-900">{prod.name}</div>
                             <div className="text-xs text-emerald-600 font-black mt-0.5">₹{prod.price}</div>
                           </div>
-                        </div>
+                        </button>
                       ))}
                     </div>
                   ) : (
@@ -385,7 +389,7 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, onLoginClick,
       {/* Mobile Drawer Overlay */}
       {isMenuOpen && (
         <>
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] transition-opacity duration-500" onClick={() => setIsMenuOpen(false)}></div>
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] transition-opacity duration-500 cursor-pointer" onClick={() => setIsMenuOpen(false)}></div>
           <div className="fixed top-0 left-0 h-full w-[80%] max-sm bg-white dark:bg-[#121212] z-[110] shadow-[20px_0_60px_rgba(0,0,0,0.15)] animate-[slideInLeft_0.4s_ease-out] flex flex-col transition-colors">
             <div className="p-8 bg-emerald-600 text-white relative">
               <button onClick={() => setIsMenuOpen(false)} className="absolute top-6 right-6 text-white/50 hover:text-white transition-colors">
