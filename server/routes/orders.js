@@ -69,9 +69,12 @@ router.post('/', protect, async (req, res) => {
 // @access  Private
 router.get('/myorders', protect, async (req, res) => {
   try {
-    const orders = await Order.find({ userId: req.user._id }).sort({ createdAt: -1 });
+    const orders = await Order.find({ userId: req.user._id })
+      .populate('cashPersonId')
+      .sort({ createdAt: -1 });
     res.json(orders);
   } catch (error) {
+
     console.error('Fetch orders error:', error);
     res.status(500).json({ message: error.message });
   }
@@ -112,6 +115,13 @@ router.put('/:id/status', protect, async (req, res) => {
     }
 
     order.orderStatus = status;
+    
+    // If status is 'Returned', save reason and image
+    if (status === 'Returned') {
+      order.returnReason = req.body.returnReason || null;
+      order.returnComment = req.body.returnComment || null;
+      order.returnImage = req.body.returnImage || null;
+    }
     
     // If cancelled, also update payment status if it was COD
     if (status === 'Cancelled' && order.paymentMethod === 'COD') {

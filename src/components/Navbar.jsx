@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { ShoppingCart, ChevronDown, Menu, Heart, Search, X, Wheat, Leaf, ShoppingBag, Package, Coffee, LogOut, Settings, UserCircle, Home, LayoutGrid, PhoneCall, MapPin, Clock } from 'lucide-react';
+import { ShoppingCart, ChevronDown, Menu, Heart, Search, X, Wheat, Leaf, ShoppingBag, Package, Coffee, LogOut, Settings, UserCircle, Home, LayoutGrid, PhoneCall, MapPin, Clock, Sun, Moon } from 'lucide-react';
 import { useLocation } from '../hooks/useLocation';
 import { IMAGE_BASE_URL } from '../config';
 
-export default function Navbar({ cartCount = 0, wishlistCount = 0, onLoginClick, onNavigate, onSearch, onCategoryClick, onNavigateToProduct, currentPage = 'home', isB2B = false, onLogout, user, categories = [], subcategories = [], allProducts = [] }) {
+export default function Navbar({ cartCount = 0, wishlistCount = 0, onLoginClick, onNavigate, onSearch, onCategoryClick, onNavigateToProduct, currentPage = 'home', isB2B = false, onLogout, user, categories = [], subcategories = [], allProducts = [], isDarkMode, toggleTheme }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [localSearchQuery, setLocalSearchQuery] = useState('');
@@ -65,18 +65,18 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, onLoginClick,
 
   return (
     <>
-      <div className="bg-white/70 backdrop-blur-xl fixed top-0 left-0 w-full z-50 border-b border-gray-100 h-[72px] flex flex-col justify-center">
+      <div className="theme-navbar backdrop-blur-xl fixed top-0 left-0 w-full z-50 border-b border-gray-100 dark:border-white/5 h-[72px] flex flex-col justify-center transition-all duration-500">
         <nav className="container mx-auto px-4 md:px-6 flex items-center justify-between relative h-full">
           {/* Left: Menu & Logo */}
           <div className="flex items-center gap-2 md:gap-4">
             <button 
-              className="lg:hidden h-10 w-10 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-700 active:scale-95 transition-all"
+              className="lg:hidden h-10 w-10 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center text-emerald-700 dark:text-emerald-400 active:scale-95 transition-all"
               onClick={() => setIsMenuOpen(true)}
             >
               <Menu size={22} />
             </button>
             <div className="flex items-center cursor-pointer" onClick={() => onNavigate('home')}>
-              <img src="/logo.png" alt="Zudo Logo" className="h-10 md:h-12 w-auto object-contain drop-shadow-sm" />
+              <img src="/logo.png" alt="Zudo Logo" className="h-10 md:h-12 w-auto object-contain drop-shadow-sm brightness-0 dark:brightness-0 dark:invert" />
             </div>
             
             {/* Live Location Display */}
@@ -87,7 +87,7 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, onLoginClick,
               </div>
               <button 
                 onClick={refreshLocation}
-                className="text-[11px] font-black text-gray-800 flex items-center gap-1 hover:text-emerald-600 transition-colors max-w-[120px] lg:max-w-[200px]"
+                className="text-[11px] font-black text-gray-800 dark:text-gray-200 flex items-center gap-1 hover:text-emerald-600 transition-colors max-w-[120px] lg:max-w-[200px]"
               >
                 <span className="truncate">{locationLoading ? 'Locating...' : (displayLocation)}</span>
                 <ChevronDown size={10} strokeWidth={3} />
@@ -98,12 +98,12 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, onLoginClick,
           {/* Center: Desktop Navigation */}
           <div className="hidden lg:flex items-center justify-center flex-1 mx-8 h-full">
             {!isSearchOpen ? (
-              <div className="flex items-center gap-8 text-[13px] font-black uppercase tracking-widest text-gray-800">
-                <button onClick={() => onNavigate('home')} className={`pb-1 transition-all ${currentPage === 'home' ? 'text-emerald-700 scale-105' : 'hover:text-emerald-600 opacity-60 hover:opacity-100'}`}>Home</button>
-                <button onClick={() => onNavigate('products')} className={`pb-1 transition-all ${currentPage === 'products' ? 'text-emerald-700 scale-105' : 'hover:text-emerald-600 opacity-60 hover:opacity-100'}`}>Products</button>
+              <div className="flex items-center gap-8 text-[13px] font-black uppercase tracking-widest text-gray-800 dark:text-gray-200">
+                <button onClick={() => onNavigate('home')} className={`pb-1 transition-all ${currentPage === 'home' ? 'text-emerald-700 dark:text-emerald-400 scale-105' : 'text-gray-500 hover:text-emerald-600 dark:text-gray-400 dark:hover:text-emerald-400'}`}>Home</button>
+                <button onClick={() => onNavigate('products')} className={`pb-1 transition-all ${currentPage === 'products' ? 'text-emerald-700 dark:text-emerald-400 scale-105' : 'text-gray-500 hover:text-emerald-600 dark:text-gray-400 dark:hover:text-emerald-400'}`}>Products</button>
                 
                 <div className="relative group cursor-pointer h-[72px] flex items-center">
-                  <button className="flex items-center gap-1 hover:text-emerald-600 transition-all pb-1 opacity-60 group-hover:opacity-100">
+                  <button className="flex items-center gap-1 text-gray-500 hover:text-emerald-600 dark:text-gray-400 dark:hover:text-emerald-400 transition-all pb-1 group-hover:opacity-100">
                     Categories <ChevronDown size={14} className="mt-0.5 group-hover:rotate-180 transition-transform" />
                   </button>
                   <div className="absolute top-full -left-10 pt-3 w-[580px] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 z-50">
@@ -154,7 +154,7 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, onLoginClick,
                   </div>
                 </div>
                 
-                <button onClick={() => onNavigate('contact')} className={`pb-1 transition-all ${currentPage === 'contact' ? 'text-emerald-700 scale-105' : 'hover:text-emerald-600 opacity-60 hover:opacity-100'}`}>Contact</button>
+                <button onClick={() => onNavigate('contact')} className={`pb-1 transition-all ${currentPage === 'contact' ? 'text-emerald-700 dark:text-emerald-400 scale-105' : 'text-gray-500 hover:text-emerald-600 dark:text-gray-400 dark:hover:text-emerald-400'}`}>Contact</button>
               </div>
             ) : (
               <div className="w-full max-w-2xl relative animate-[fadeIn_0.3s_ease-out] flex items-center h-full">
@@ -205,8 +205,16 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, onLoginClick,
           {/* Right: Icons & Profile */}
           <div className="flex items-center gap-2 md:gap-4">
             <button 
+              onClick={toggleTheme}
+              className="h-10 w-10 md:h-11 md:w-11 rounded-full bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center hover:bg-emerald-600 dark:hover:bg-emerald-500 hover:text-white transition-all text-emerald-700 dark:text-emerald-400"
+              title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+            >
+              {isDarkMode ? <Sun size={18} strokeWidth={2.5} /> : <Moon size={18} strokeWidth={2.5} />}
+            </button>
+
+            <button 
               onClick={() => setIsSearchOpen(!isSearchOpen)} 
-              className={`h-10 w-10 md:h-11 md:w-11 rounded-full bg-emerald-50 flex items-center justify-center hover:bg-emerald-600 hover:text-white transition-all text-emerald-700 ${isSearchOpen && !window.matchMedia('(max-width: 1024px)').matches ? 'lg:opacity-0 lg:pointer-events-none' : ''}`}
+              className={`h-10 w-10 md:h-11 md:w-11 rounded-full bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center hover:bg-emerald-600 dark:hover:bg-emerald-500 hover:text-white transition-all text-emerald-700 dark:text-emerald-400 ${isSearchOpen && !window.matchMedia('(max-width: 1024px)').matches ? 'lg:opacity-0 lg:pointer-events-none' : ''}`}
             >
               <Search size={18} strokeWidth={2.5} />
             </button>
@@ -237,8 +245,8 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, onLoginClick,
               <div className="relative group">
                 <button className="flex items-center gap-3 bg-gray-50 hover:bg-white px-1.5 md:px-4 py-1.5 rounded-2xl border border-gray-100 hover:border-emerald-100 transition-all duration-300">
                   <div className="w-8 h-8 md:w-9 md:h-9 rounded-xl bg-emerald-600 overflow-hidden border-2 border-white shadow-sm flex-shrink-0">
-                    {user.profileImage ? (
-                      <img src={user.profileImage} alt={user.name} className="w-full h-full object-cover" />
+                    {user.profileImage || user.profilePicture ? (
+                      <img src={user.profileImage || user.profilePicture} alt={user.name} className="w-full h-full object-cover" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-white">
                         <UserCircle size={20} />
@@ -339,7 +347,7 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, onLoginClick,
       </div>
 
       {/* Modern Mobile Bottom Nav (App Style) */}
-      <div className="lg:hidden fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-md bg-white/90 backdrop-blur-2xl h-16 rounded-[2rem] border border-white/20 shadow-[0_20px_50px_rgba(0,0,0,0.2)] z-50 flex items-center justify-around px-2">
+      <div className="lg:hidden fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-md bg-white dark:bg-[#121212]/90 backdrop-blur-2xl h-16 rounded-[2rem] border border-white/20 shadow-[0_20px_50px_rgba(0,0,0,0.2)] z-50 flex items-center justify-around px-2 transition-colors">
         <button onClick={() => onNavigate('home')} className={`flex flex-col items-center gap-1 transition-all ${currentPage === 'home' ? 'text-emerald-600 scale-110' : 'text-gray-400'}`}>
           <Home size={22} strokeWidth={currentPage === 'home' ? 3 : 2} />
           <span className="text-[9px] font-black uppercase tracking-tighter">Home</span>
@@ -366,7 +374,7 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, onLoginClick,
         {user && (
           <button onClick={() => onNavigate('profile')} className={`flex flex-col items-center gap-1 transition-all ${currentPage === 'profile' ? 'text-emerald-600 scale-110' : 'text-gray-400'}`}>
             <div className={`w-6 h-6 rounded-lg overflow-hidden border-2 ${currentPage === 'profile' ? 'border-emerald-600' : 'border-gray-200'}`}>
-              <img src={user.profileImage || 'https://via.placeholder.com/100'} className="w-full h-full object-cover" />
+              <img src={user.profileImage || user.profilePicture || 'https://via.placeholder.com/100'} className="w-full h-full object-cover" />
             </div>
             <span className="text-[9px] font-black uppercase tracking-tighter">Me</span>
           </button>
@@ -377,7 +385,7 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, onLoginClick,
       {isMenuOpen && (
         <>
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] transition-opacity duration-500" onClick={() => setIsMenuOpen(false)}></div>
-          <div className="fixed top-0 left-0 h-full w-[80%] max-sm bg-white z-[110] shadow-[20px_0_60px_rgba(0,0,0,0.15)] animate-[slideInLeft_0.4s_ease-out] flex flex-col">
+          <div className="fixed top-0 left-0 h-full w-[80%] max-sm bg-white dark:bg-[#121212] z-[110] shadow-[20px_0_60px_rgba(0,0,0,0.15)] animate-[slideInLeft_0.4s_ease-out] flex flex-col transition-colors">
             <div className="p-8 bg-emerald-600 text-white relative">
               <button onClick={() => setIsMenuOpen(false)} className="absolute top-6 right-6 text-white/50 hover:text-white transition-colors">
                 <X size={24} />
@@ -394,7 +402,7 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, onLoginClick,
               {user ? (
                 <div className="flex items-center gap-3 mt-8 p-3 bg-white/10 rounded-2xl border border-white/10">
                   <div className="w-10 h-10 rounded-xl overflow-hidden border-2 border-white/20">
-                    <img src={user.profileImage || 'https://via.placeholder.com/100'} className="w-full h-full object-cover" />
+                    <img src={user.profileImage || user.profilePicture || 'https://via.placeholder.com/100'} className="w-full h-full object-cover" />
                   </div>
                   <div>
                     <p className="text-xs font-black leading-none">{user.name}</p>

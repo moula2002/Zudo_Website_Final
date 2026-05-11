@@ -4,6 +4,8 @@ const jwt = require('jsonwebtoken');
 const Admin = require('../models/Admin');
 const User = require('../models/User');
 const { protect, superAdmin } = require('../middleware/auth');
+const crypto = require('crypto');
+const nodemailer = require('nodemailer');
 
 // Helper to format user response
 const formatUser = (user) => ({
@@ -42,13 +44,18 @@ router.post('/login', async (req, res) => {
 
 // @route   POST /api/auth/register
 router.post('/register', async (req, res) => {
+  console.log('REGISTRATION REQUEST:', req.body);
   try {
     const { name, email, password, role, phone, businessName, gstPdf } = req.body;
+    const targetRole = role || 'b2c';
     
     // Check if account with THIS EXACT role already exists
-    const userExists = await User.findOne({ email, role: role || 'b2c' });
+    const userExists = await User.findOne({ email, role: targetRole });
     if (userExists) {
-      return res.status(400).json({ message: `An account with the ${role.toUpperCase()} role already exists for this email.` });
+      return res.status(400).json({ 
+        message: `An account with the ${targetRole.toUpperCase()} role already exists for this email.`,
+        error: 'ALREADY_EXISTS'
+      });
     }
 
     // Create user with ALL provided fields (including B2B docs if present)
@@ -56,17 +63,22 @@ router.post('/register', async (req, res) => {
       name, 
       email, 
       password, 
-      role: role || 'b2c', 
+      role: targetRole, 
       phone,
       businessName: businessName || '',
       gstPdf: gstPdf || '',
-      isWaitingApproval: role === 'b2b' ? true : false
+      isWaitingApproval: false
     });
 
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '30d' });
     res.status(201).json({ token, user: formatUser(user) });
   } catch (error) {
     console.error('Registration Error:', error);
+    // If it's a Mongoose validation error, provide details
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors).map(val => val.message);
+      return res.status(400).json({ message: messages.join(', '), error: 'VALIDATION_ERROR' });
+    }
     res.status(400).json({ message: error.message });
   }
 });
@@ -160,13 +172,94 @@ router.post('/google-login', async (req, res) => {
       user = await User.create({
         name, email, profilePicture, role: targetRole,
         password: Math.random().toString(36).slice(-10),
-        isWaitingApproval: targetRole === 'b2b' ? true : false
+        isWaitingApproval: false
       });
     }
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '30d' });
     res.json({ token, user: formatUser(user) });
   } catch (error) {
     res.status(400).json({ message: error.message });
+  }
+});
+
+// @route   POST /api/auth/forgot-password
+router.post('/forgot-password', async (req, res) => {
+  const { email, role } = req.body;
+  try {
+    const user = await User.findOne({ email, role: role || 'b2c' });
+    if (!user) {
+      return res.status(404).json({ message: 'User with this email and role not found' });
+    }
+
+    // Generate reset token
+    const resetToken = crypto.randomBytes(20).toString('hex');
+    user.resetPasswordToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+    user.resetPasswordExpires = Date.now() + 3600000; // 1 hour
+
+    await user.save();
+
+    // Send email (Mock for now, but configured with nodemailer)
+    const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password/${resetToken}`;
+    
+    // Check if email config exists
+    if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+      const transporter = nodemailer.createTransport({
+        service: process.env.EMAIL_SERVICE || 'gmail',
+        auth: {
+          user: process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASS
+        }
+      });
+
+      const mailOptions = {
+        to: user.email,
+        from: `Zudo <${process.env.EMAIL_USER}>`,
+        subject: 'Password Reset Request',
+        text: `You are receiving this because you (or someone else) have requested the reset of the password for your account.\n\n` +
+          `Please click on the following link, or paste this into your browser to complete the process:\n\n` +
+          `${resetUrl}\n\n` +
+          `If you did not request this, please ignore this email and your password will remain unchanged.\n`
+      };
+
+      await transporter.sendMail(mailOptions);
+      res.json({ message: 'Email sent' });
+    } else {
+      // If no email config, return token for testing (SECURITY RISK IN PRODUCTION)
+      res.json({ 
+        message: 'Email configuration missing. Token returned for testing.',
+        resetToken: resetToken,
+        resetUrl: resetUrl
+      });
+    }
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// @route   POST /api/auth/reset-password/:token
+router.post('/reset-password/:token', async (req, res) => {
+  try {
+    const resetPasswordToken = crypto.createHash('sha256').update(req.params.token).digest('hex');
+
+    const user = await User.findOne({
+      resetPasswordToken,
+      resetPasswordExpires: { $gt: Date.now() }
+    });
+
+    if (!user) {
+      return res.status(400).json({ message: 'Invalid or expired token' });
+    }
+
+    // Set new password
+    user.password = req.body.password;
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpires = undefined;
+
+    await user.save();
+
+    res.json({ message: 'Password reset successful' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
   }
 });
 

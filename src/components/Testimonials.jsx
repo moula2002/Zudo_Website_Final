@@ -30,16 +30,16 @@ export default function Testimonials() {
   ];
 
   return (
-    <section className="bg-emerald-50/50 py-24 relative overflow-hidden mt-10">
+    <section className="bg-emerald-50/50 dark:bg-[#0a0a0a] py-24 relative overflow-hidden mt-10 transition-colors">
       {/* Decorative glowing blobs */}
-      <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-emerald-200 rounded-full mix-blend-multiply filter blur-[100px] opacity-40 -translate-x-1/2 -translate-y-1/2"></div>
-      <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-emerald-300 rounded-full mix-blend-multiply filter blur-[100px] opacity-30 translate-x-1/2 translate-y-1/2"></div>
+      <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-emerald-200 dark:bg-emerald-500/10 rounded-full mix-blend-multiply filter blur-[100px] opacity-40 -translate-x-1/2 -translate-y-1/2 transition-colors"></div>
+      <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-emerald-300 dark:bg-emerald-500/10 rounded-full mix-blend-multiply filter blur-[100px] opacity-30 translate-x-1/2 translate-y-1/2 transition-colors"></div>
 
       <div className="container mx-auto px-6 relative z-10">
         <div className="text-center max-w-2xl mx-auto mb-16">
           <div className="text-emerald-600 font-extrabold tracking-widest text-xs md:text-sm mb-3 uppercase">Customer Stories</div>
           <h2 className="text-3xl md:text-5xl font-extrabold text-gray-900 mb-6">Loved by Thousands</h2>
-          <p className="text-gray-500 text-lg font-medium">See what our community has to say about their experience with our premium groceries.</p>
+          <p className="text-gray-500 dark:text-gray-300 text-lg font-medium">See what our community has to say about their experience with our premium groceries.</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">

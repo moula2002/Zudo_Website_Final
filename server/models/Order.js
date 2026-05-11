@@ -59,6 +59,23 @@ const orderSchema = new mongoose.Schema({
     type: String,
     default: null
   },
+  cashPersonId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'CashCollector'
+  },
+  returnReason: {
+    type: String,
+    default: null
+  },
+  returnImage: {
+    type: String,
+    default: null
+  },
+  returnComment: {
+    type: String,
+    default: null
+  },
+
   createdAt: {
     type: Date,
     default: Date.now

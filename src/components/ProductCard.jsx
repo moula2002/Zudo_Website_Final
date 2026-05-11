@@ -43,7 +43,7 @@ export default function ProductCard({ product, onAddToCart, onUpdateQuantity, on
             <div className="bg-white/90 backdrop-blur-md rounded-2xl p-3 shadow-2xl flex items-center justify-between border border-white/20">
                <div className="flex flex-col">
                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tight">Price per unit</span>
-                 <span className="text-sm font-black text-gray-900-600">
+                 <span className="text-sm font-black text-black">
                    {typeof product.price === 'number' ? `₹${product.price}` : (product.price?.startsWith('₹') ? product.price : `₹${product.price}`)}
                  </span>
                </div>
@@ -114,7 +114,7 @@ export default function ProductCard({ product, onAddToCart, onUpdateQuantity, on
               <span className="text-gray-400 text-[11px] line-through font-bold mb-0.5 tracking-tight">₹{product.oldPrice}</span>
             )}
             <div className="flex flex-col">
-              <span className={`font-black tracking-tighter ${isPending ? 'text-amber-600 text-sm flex items-center gap-1 animate-pulse' : 'text-gray-900 text-xl'}`}>
+              <span className={`font-black tracking-tighter ${isPending ? 'text-amber-600 text-sm flex items-center gap-1 animate-pulse' : 'text-gray-900 dark:text-white text-xl'}`}>
                 {isPending && <Clock size={12} />}
                 {typeof product.price === 'number' ? `₹${product.price}` : (product.price?.startsWith('₹') ? product.price : (isPending ? product.price : `₹${product.price}`))}
               </span>

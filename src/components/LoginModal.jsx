@@ -18,6 +18,10 @@ export default function LoginModal({ onClose, setUser, initialB2B = null }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showBackendWarning, setShowBackendWarning] = useState(false);
+  const [isForgotMode, setIsForgotMode] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotSuccess, setForgotSuccess] = useState('');
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -112,7 +116,14 @@ export default function LoginModal({ onClose, setUser, initialB2B = null }) {
 
   const saveAndFinalize = (data) => {
     // Ensure we save the user object correctly regardless of structure
-    const userData = data.user || { ...data, token: undefined };
+    let userData = data.user || { ...data, token: undefined };
+    
+    // Ensure profileImage is set for frontend consistency
+    userData = {
+      ...userData,
+      profileImage: userData.profilePicture || userData.profileImage
+    };
+
     localStorage.setItem('token', data.token);
     localStorage.setItem('user', JSON.stringify(userData));
     if (setUser) setUser(userData);
@@ -149,30 +160,10 @@ export default function LoginModal({ onClose, setUser, initialB2B = null }) {
     setLoading(true);
     setError('');
 
-    if (!isLogin && isB2B && !documentFile) {
-      setError('Business verification document is required');
-      setLoading(false);
-      return;
-    }
-
     const endpoint = isLogin ? '/auth/user-login' : '/auth/register';
     
     try {
-      let finalDocUrl = '';
-      
-      if (!isLogin && isB2B && documentFile) {
-        const uploadData = new FormData();
-        uploadData.append('file', documentFile);
-        
-        const uploadRes = await fetch(`${API_URL}/upload`, {
-          method: 'POST',
-          body: uploadData
-        });
-        
-        if (!uploadRes.ok) throw new Error('Document upload failed');
-        const uploadResult = await uploadRes.json();
-        finalDocUrl = `${API_BASE_URL}${uploadResult.url}`;
-      }
+
 
       const payload = isLogin 
         ? { email: formData.email, password: formData.password, role: isB2B ? 'b2b' : 'b2c' }
@@ -183,7 +174,7 @@ export default function LoginModal({ onClose, setUser, initialB2B = null }) {
             phone: formData.phone,
             role: isB2B ? 'b2b' : 'b2c',
             businessName: isB2B ? formData.companyName : '',
-            gstPdf: isB2B ? finalDocUrl : ''
+            gstPdf: ''
           };
 
       const response = await fetch(`${API_URL}${endpoint}`, {
@@ -214,39 +205,67 @@ export default function LoginModal({ onClose, setUser, initialB2B = null }) {
     }
   };
 
+  const handleForgotSubmit = async (e) => {
+    e.preventDefault();
+    setForgotLoading(true);
+    setError('');
+    setForgotSuccess('');
+
+    try {
+      const response = await fetch(`${API_URL}/auth/forgot-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: forgotEmail, role: isB2B ? 'b2b' : 'b2c' })
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Failed to send reset email');
+
+      setForgotSuccess('Reset link sent! Please check your email.');
+      // If in test mode (no email config), we might show the token but better to just show success
+      if (data.resetUrl) {
+        console.log('Test Reset URL:', data.resetUrl);
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setForgotLoading(false);
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="bg-white rounded-3xl w-full max-w-md flex overflow-hidden shadow-2xl relative animate-[fadeIn_0.3s_ease-out]">
-        <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-black transition-all z-[110] bg-gray-50 p-1.5 rounded-full">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+      <div className="bg-white dark:bg-[#121212] rounded-3xl w-full max-w-md flex overflow-hidden shadow-2xl relative animate-[fadeIn_0.3s_ease-out] border border-white/5">
+        <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-black dark:hover:text-white transition-all z-[110] bg-gray-50 dark:bg-white/10 p-1.5 rounded-full">
           <X size={18} />
         </button>
 
         {!selection ? (
           <div className="w-full flex flex-col md:flex-row min-h-[400px]">
-             <div className="flex-1 group relative overflow-hidden flex flex-col items-center justify-center p-8 transition-all duration-700 hover:bg-emerald-50/50 border-r border-gray-100">
+             <div className="flex-1 group relative overflow-hidden flex flex-col items-center justify-center p-8 transition-all duration-700 hover:bg-emerald-50/50 dark:hover:bg-emerald-500/10 border-r border-gray-100 dark:border-white/5 bg-[#0f172a] dark:bg-black">
                 <div className="relative z-10 flex flex-col items-center text-center">
                   <div className="w-20 h-20 bg-emerald-600 rounded-2xl flex items-center justify-center text-white mb-6 shadow-xl shadow-emerald-600/20 group-hover:scale-110 transition-all duration-500">
                     <UserCircle size={40} />
                   </div>
-                  <h3 className="text-2xl font-black text-gray-900 mb-2 tracking-tight">Personal</h3>
-                  <p className="text-gray-500 font-bold text-xs max-w-[200px]">Shop our fresh grocery collection.</p>
-                  <button onClick={() => { setSelection('b2c'); setIsB2B(false); }} className="mt-6 px-6 py-3 bg-white border-2 border-emerald-600 text-emerald-700 font-black text-xs rounded-xl hover:bg-emerald-600 hover:text-white transition-all duration-300 shadow-lg shadow-emerald-600/5">Continue as Customer</button>
+                  <h3 className="text-2xl font-black text-white mb-2 tracking-tight">Personal</h3>
+                  <p className="text-gray-400 font-bold text-xs max-w-[200px]">Shop our fresh grocery collection.</p>
+                  <button onClick={() => { setSelection('b2c'); setIsB2B(false); }} className="mt-6 px-6 py-3 bg-transparent border-2 border-emerald-600 text-emerald-400 font-black text-xs rounded-xl hover:bg-emerald-600 hover:text-white transition-all duration-300 shadow-lg shadow-emerald-600/5">Continue as Customer</button>
                 </div>
              </div>
 
-             <div className="flex-1 group relative overflow-hidden flex flex-col items-center justify-center p-8 transition-all duration-700 hover:bg-gray-50">
+             <div className="flex-1 group relative overflow-hidden flex flex-col items-center justify-center p-8 transition-all duration-700 hover:bg-gray-50 dark:hover:bg-white/5 bg-white dark:bg-[#121212]">
                 <div className="relative z-10 flex flex-col items-center text-center">
-                  <div className="w-20 h-20 bg-gray-900 rounded-2xl flex items-center justify-center text-white mb-6 shadow-xl shadow-gray-900/20 group-hover:scale-110 transition-all duration-500 group-hover:bg-emerald-500 group-hover:shadow-emerald-500/20">
+                  <div className="w-20 h-20 bg-gray-900 dark:bg-emerald-600 rounded-2xl flex items-center justify-center text-white mb-6 shadow-xl shadow-gray-900/20 dark:shadow-emerald-600/20 group-hover:scale-110 transition-all duration-500">
                     <Building2 size={40} />
                   </div>
-                  <h3 className="text-2xl font-black text-gray-900 mb-2 tracking-tight">Business</h3>
-                  <p className="text-gray-500 font-bold text-xs max-w-[200px]">Bulk pricing and wholesale distributions.</p>
-                  <button onClick={() => { setSelection('b2b'); setIsB2B(true); }} className="mt-6 px-6 py-3 bg-gray-900 text-white font-black text-xs rounded-xl hover:bg-emerald-600 transition-all duration-300">Partner Portal</button>
+                  <h3 className="text-2xl font-black text-gray-900 dark:text-white mb-2 tracking-tight">Business</h3>
+                  <p className="text-gray-500 dark:text-gray-400 font-bold text-xs max-w-[200px]">Bulk pricing and wholesale distributions.</p>
+                  <button onClick={() => { setSelection('b2b'); setIsB2B(true); }} className="mt-6 px-6 py-3 bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-black text-xs rounded-xl hover:bg-emerald-600 hover:text-white transition-all duration-300">Partner Portal</button>
                 </div>
              </div>
           </div>
         ) : (
-          <div className="w-full p-8 md:p-12 relative bg-white flex flex-col justify-center max-h-[90vh] overflow-y-auto">
+          <div className="w-full p-8 md:p-12 relative bg-white dark:bg-[#121212] flex flex-col justify-center max-h-[90vh] overflow-y-auto">
             <div className="mb-8 text-center">
               <button onClick={() => { setSelection(null); setIsB2B(false); }} className="mx-auto flex items-center gap-2 text-emerald-600 font-black text-[9px] uppercase tracking-widest mb-6 hover:translate-x-[-2px] transition-transform w-fit"><ArrowLeft size={12} strokeWidth={3} />Change Account Type</button>
               
@@ -261,7 +280,8 @@ export default function LoginModal({ onClose, setUser, initialB2B = null }) {
 
               {error && <div className="mb-4 p-3 bg-red-50 border border-red-100 text-red-600 text-[10px] font-black rounded-xl">{error}</div>}
 
-              <form className="space-y-4" onSubmit={handleSubmit}>
+              {!isForgotMode ? (
+                <form className="space-y-4" onSubmit={handleSubmit}>
                 {!isLogin && (
                   <div className="space-y-4">
                     <div className="relative group">
@@ -278,12 +298,6 @@ export default function LoginModal({ onClose, setUser, initialB2B = null }) {
                       <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-emerald-600" size={16} />
                       <input type="tel" name="phone" value={formData.phone} onChange={handleChange} placeholder="Phone Number" className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-100 bg-gray-50/50 focus:bg-white text-xs font-bold" required />
                     </div>
-                    {isB2B && (
-                      <div className="relative group p-3 border border-dashed border-gray-200 rounded-xl cursor-pointer">
-                        <input type="file" accept=".pdf,image/*" onChange={handleFileChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" required />
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider text-center">{documentFile ? documentFile.name : 'Upload Documents'}</p>
-                      </div>
-                    )}
                   </div>
                 )}
                 
@@ -296,6 +310,18 @@ export default function LoginModal({ onClose, setUser, initialB2B = null }) {
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-emerald-600" size={16} />
                   <input type="password" name="password" value={formData.password} onChange={handleChange} placeholder="Password" className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-100 bg-gray-50/50 focus:bg-white text-xs font-bold" required />
                 </div>
+
+                {isLogin && (
+                  <div className="flex justify-end">
+                    <button 
+                      type="button" 
+                      onClick={() => { setIsForgotMode(true); setError(''); setForgotSuccess(''); }} 
+                      className="text-[10px] font-black text-emerald-600 uppercase tracking-widest hover:underline"
+                    >
+                      Forgot Password?
+                    </button>
+                  </div>
+                )}
 
                 <button type="submit" disabled={loading} className={`w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-3 rounded-xl shadow-lg transition-all text-xs mt-2 flex items-center justify-center gap-2 ${loading ? 'opacity-70' : ''}`}>
                   {loading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : <>{isLogin ? 'Sign In' : 'Create Account'}</>}
@@ -311,11 +337,51 @@ export default function LoginModal({ onClose, setUser, initialB2B = null }) {
                   Google
                 </button>
               </form>
+            ) : (
+              <form className="space-y-4" onSubmit={handleForgotSubmit}>
+                <div className="relative group">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-emerald-600" size={16} />
+                  <input 
+                    type="email" 
+                    value={forgotEmail} 
+                    onChange={(e) => setForgotEmail(e.target.value)} 
+                    placeholder="Enter your email" 
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-100 bg-gray-50/50 focus:bg-white text-xs font-bold" 
+                    required 
+                  />
+                </div>
 
+                {forgotSuccess && (
+                  <div className="p-3 bg-emerald-50 border border-emerald-100 text-emerald-600 text-[10px] font-black rounded-xl flex items-center gap-2">
+                    <CheckCircle2 size={14} />
+                    {forgotSuccess}
+                  </div>
+                )}
+
+                <button 
+                  type="submit" 
+                  disabled={forgotLoading} 
+                  className={`w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-3 rounded-xl shadow-lg transition-all text-xs mt-2 flex items-center justify-center gap-2 ${forgotLoading ? 'opacity-70' : ''}`}
+                >
+                  {forgotLoading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : 'Send Reset Link'}
+                </button>
+
+                <button 
+                  type="button" 
+                  onClick={() => setIsForgotMode(false)} 
+                  className="w-full text-center text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-emerald-600 transition-colors"
+                >
+                  Back to Login
+                </button>
+              </form>
+            )}
+
+            {!isForgotMode && (
               <div className="mt-6 text-center">
                 <p className="text-gray-400 font-bold text-[10px]">{isLogin ? "New here? " : "Joined already? "}<button onClick={() => setIsLogin(!isLogin)} className="text-emerald-600 font-black uppercase tracking-widest ml-1 hover:underline">{isLogin ? 'Sign Up' : 'Sign In'}</button></p>
               </div>
-            </div>
+            )}
+          </div>
         )}
       </div>
     </div>

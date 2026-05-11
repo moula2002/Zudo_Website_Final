@@ -11,7 +11,7 @@ export default function B2BVerificationScreen({ onSkip, onBack, user, onUpdateUs
   const [error, setError] = useState('');
   const [status, setStatus] = useState(user?.gstPdf ? 'uploaded' : 'pending');
 
-  const HOSTINGER_BASE = 'https://lightgreen-trout-176417.hostingersite.com';
+  const HOSTINGER_BASE = API_BASE_URL;
 
   const handleFileUpload = async (e, type) => {
     const file = e.target.files[0];

@@ -28,7 +28,7 @@ export default function ProductDetails({ product, onAddToCart, onToggleWishlist,
   };
 
   const isPending = product?.price === 'Verification Pending';
-  const HOSTINGER_BASE = 'https://lightgreen-trout-176417.hostingersite.com';
+  const HOSTINGER_BASE = API_BASE_URL;
 
   useEffect(() => {
     if (product?.id) {
@@ -125,21 +125,21 @@ export default function ProductDetails({ product, onAddToCart, onToggleWishlist,
   const averageRating = reviews.length > 0 ? (reviews.reduce((acc, r) => acc + r.rating, 0) / reviews.length).toFixed(1) : '4.8';
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-8 flex-grow mt-6 bg-white rounded-2xl shadow-sm mb-10 border border-gray-100">
+    <div className="max-w-5xl mx-auto px-4 py-8 flex-grow mt-6 bg-white dark:bg-[#121212] rounded-2xl shadow-sm mb-10 border border-gray-100 dark:border-white/5 transition-colors">
       <button onClick={() => onNavigate('products')} className="flex items-center gap-2 text-gray-400 hover:text-emerald-600 mb-6 font-bold uppercase tracking-widest text-[8px] transition-all group">
         <ArrowLeft size={12} /> Back to Products
       </button>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-10">
         <div className="space-y-4">
-          <div className="aspect-square bg-gray-50 rounded-2xl overflow-hidden group relative border border-gray-100">
+          <div className="aspect-square bg-gray-50 dark:bg-white/5 rounded-2xl overflow-hidden group relative border border-gray-100 dark:border-white/10 transition-colors">
             <img 
               src={(product.image || product.imageUrl)?.startsWith('http') ? (product.image || product.imageUrl) : `${IMAGE_BASE_URL}${product.image || product.imageUrl}`} 
               alt={product.name} 
               className="w-full h-full object-contain p-6 transition-transform duration-500 group-hover:scale-105" 
             />
             <div className="absolute top-4 left-4 flex flex-col gap-2">
-              <span className="px-3 py-1 bg-white/90 backdrop-blur-md text-emerald-700 rounded-lg text-[9px] font-black uppercase tracking-widest shadow-sm border border-emerald-100/30">{product.category}</span>
+              <span className="px-3 py-1 bg-white/90 dark:bg-emerald-600 backdrop-blur-md text-emerald-700 dark:text-white rounded-lg text-[9px] font-black uppercase tracking-widest shadow-sm border border-emerald-100/30">{product.category}</span>
               {product.oldPrice && !isPending && (
                 <span className="px-3 py-1 bg-red-500 text-white rounded-lg text-[9px] font-black uppercase tracking-widest shadow-lg shadow-red-500/20 w-fit">Sale</span>
               )}
@@ -147,7 +147,7 @@ export default function ProductDetails({ product, onAddToCart, onToggleWishlist,
           </div>
           <div className="grid grid-cols-4 gap-3">
             {[...Array(4)].map((_, i) => (
-              <div key={i} className="aspect-square bg-gray-50 rounded-xl border border-gray-100 hover:border-emerald-200 transition-all overflow-hidden p-2 opacity-60 hover:opacity-100 cursor-pointer">
+              <div key={i} className="aspect-square bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-100 dark:border-white/10 hover:border-emerald-200 transition-all overflow-hidden p-2 opacity-60 hover:opacity-100 cursor-pointer">
                 <img 
                   src={(product.image || product.imageUrl)?.startsWith('http') ? (product.image || product.imageUrl) : `${IMAGE_BASE_URL}${product.image || product.imageUrl}`} 
                   className="w-full h-full object-contain" 
@@ -160,14 +160,14 @@ export default function ProductDetails({ product, onAddToCart, onToggleWishlist,
         <div className="flex flex-col pt-2">
           <div className="mb-6">
             <div className="flex items-center gap-3 mb-4">
-              <div className="flex items-center gap-1 px-2 py-0.5 bg-amber-50 rounded-lg text-amber-600 border border-amber-100">
+              <div className="flex items-center gap-1 px-2 py-0.5 bg-amber-50 dark:bg-amber-500/10 rounded-lg text-amber-600 border border-amber-100 dark:border-amber-500/20">
                 <Star size={12} className="fill-amber-500 text-amber-500" />
                 <span className="text-[11px] font-black">{averageRating}</span>
               </div>
               <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">{reviews.length} Reviews</span>
             </div>
 
-            <h1 className="text-3xl font-black text-gray-900 mb-4 tracking-tight leading-tight">{product.name}</h1>
+            <h1 className="text-3xl font-black text-gray-900 dark:text-white mb-4 tracking-tight leading-tight">{product.name}</h1>
 
             <div className="flex items-center gap-4 mb-6">
               <div className="flex flex-col">
@@ -181,16 +181,16 @@ export default function ProductDetails({ product, onAddToCart, onToggleWishlist,
                   </span>
                 )}
               </div>
-              <div className="h-8 w-px bg-gray-100"></div>
-              <div className="px-3 py-1 bg-emerald-50 rounded-xl border border-emerald-50">
-                <p className="text-[8px] font-black text-emerald-700 uppercase tracking-widest">Stock Status</p>
-                <p className="text-[11px] font-bold text-gray-800">In Stock</p>
+              <div className="h-8 w-px bg-gray-100 dark:bg-white/10"></div>
+              <div className="px-3 py-1 bg-emerald-50 dark:bg-emerald-500/10 rounded-xl border border-emerald-50 dark:border-emerald-500/20">
+                <p className="text-[8px] font-black text-emerald-700 dark:text-emerald-400 uppercase tracking-widest">Stock Status</p>
+                <p className="text-[11px] font-bold text-gray-800 dark:text-gray-200">In Stock</p>
               </div>
             </div>
 
             {isB2B && (
               <div className="flex flex-wrap gap-3 mb-6">
-                <div className="px-4 py-2 bg-gray-900 text-white rounded-xl flex items-center gap-2 shadow-lg shadow-gray-900/10">
+                <div className="px-4 py-2 bg-gray-900 dark:bg-white/5 text-white rounded-xl flex items-center gap-2 shadow-lg shadow-gray-900/10">
                   <ShieldCheck size={14} className="text-emerald-400" />
                   <div className="flex flex-col">
                     <span className="text-[8px] font-black uppercase tracking-widest text-gray-400 leading-none mb-1">Verified Seller</span>
@@ -200,7 +200,7 @@ export default function ProductDetails({ product, onAddToCart, onToggleWishlist,
                     <span className="text-[9px] text-gray-500 mt-1">ID: {product.sellerId?._id || product.sellerId || 'N/A'}</span>
                   </div>
                 </div>
-                <div className="px-4 py-2 bg-amber-50 text-amber-700 rounded-xl border border-amber-100 flex items-center gap-2">
+                <div className="px-4 py-2 bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 rounded-xl border border-amber-100 dark:border-amber-500/20 flex items-center gap-2">
                   <Package size={14} />
                   <div className="flex flex-col">
                     <span className="text-[8px] font-black uppercase tracking-widest leading-none mb-1">Min. Order Qty</span>
@@ -210,28 +210,28 @@ export default function ProductDetails({ product, onAddToCart, onToggleWishlist,
               </div>
             )}
 
-            <div className="p-5 bg-gray-50 rounded-2xl border border-gray-100 mb-8">
-              <p className="text-gray-500 font-medium text-sm leading-relaxed">{product.description || 'Our premium collection is sourced directly from certified organic farms, ensuring peak freshness and nutrient density for your family.'}</p>
+            <div className="p-5 bg-gray-50 dark:bg-white/5 rounded-2xl border border-gray-100 dark:border-white/10 mb-8">
+              <p className="text-gray-500 dark:text-gray-400 font-medium text-sm leading-relaxed">{product.description || 'Our premium collection is sourced directly from certified organic farms, ensuring peak freshness and nutrient density for your family.'}</p>
             </div>
           </div>
 
           {!isPending ? (
             <div className="space-y-4">
               <div className="flex items-center gap-3">
-                <div className="flex items-center bg-white rounded-xl p-1 border border-gray-200">
-                  <button onClick={() => onUpdateQuantity(product.id, -1)} className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-gray-50 transition-all"><Minus size={16} /></button>
-                  <span className="w-10 text-center font-black text-base">{cartItems.find(i => i.id === product.id)?.quantity || 1}</span>
-                  <button onClick={() => onAddToCart(product)} className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-gray-50 transition-all"><Plus size={16} /></button>
+                <div className="flex items-center bg-white dark:bg-white/5 rounded-xl p-1 border border-gray-200 dark:border-white/10 transition-colors">
+                  <button onClick={() => onUpdateQuantity(product.id, -1)} className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-gray-50 dark:hover:bg-white/10 text-gray-900 dark:text-white transition-all"><Minus size={16} /></button>
+                  <span className="w-10 text-center font-black text-base dark:text-white">{cartItems.find(i => i.id === product.id)?.quantity || 1}</span>
+                  <button onClick={() => onAddToCart(product)} className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-gray-50 dark:hover:bg-white/10 text-gray-900 dark:text-white transition-all"><Plus size={16} /></button>
                 </div>
                 <button onClick={() => onAddToCart(product)} className="flex-grow h-12 bg-emerald-600 text-white rounded-xl font-black uppercase tracking-widest text-xs hover:bg-emerald-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 active:scale-[0.98]">
                   <ShoppingCart size={18} /> Add to Cart
                 </button>
               </div>
               <div className="flex gap-3">
-                <button onClick={() => onToggleWishlist(product)} className={`flex-1 h-12 rounded-xl border flex items-center justify-center gap-2 font-black uppercase tracking-widest text-[9px] transition-all ${isWishlisted ? 'bg-red-50 border-red-200 text-red-600' : 'bg-white border-gray-200 hover:border-emerald-200 hover:text-emerald-600'}`}>
+                <button onClick={() => onToggleWishlist(product)} className={`flex-1 h-12 rounded-xl border flex items-center justify-center gap-2 font-black uppercase tracking-widest text-[9px] transition-all ${isWishlisted ? 'bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/30 text-red-600' : 'bg-white dark:bg-white/5 border-gray-200 dark:border-white/10 text-gray-900 dark:text-white hover:border-emerald-200 hover:text-emerald-600'}`}>
                   <Heart size={16} className={isWishlisted ? 'fill-red-600' : ''} /> {isWishlisted ? 'Saved' : 'Wishlist'}
                 </button>
-                <button onClick={handleShare} className="h-12 w-12 rounded-xl bg-white border border-gray-200 flex items-center justify-center hover:border-emerald-200 transition-all text-gray-400">
+                <button onClick={handleShare} className="h-12 w-12 rounded-xl bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 flex items-center justify-center hover:border-emerald-200 transition-all text-gray-400">
                   <Share2 size={16} />
                 </button>
               </div>

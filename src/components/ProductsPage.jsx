@@ -35,7 +35,7 @@ export default function ProductsPage({ searchQuery, initialCategory = 'All', ini
     <div className="bg-[#fcfdfd] min-h-screen">
       <div className="container mx-auto px-6 py-12">
       <div className="flex items-center gap-4 mb-8">
-        <h1 className="text-3xl font-extrabold text-emerald">
+        <h1 className="text-3xl font-extrabold text-emerald-700 dark:text-emerald-400">
           {searchQuery ? `Search Results for "${searchQuery}"` : 'All Products'}
         </h1>
         {isB2B && (
@@ -94,7 +94,7 @@ export default function ProductsPage({ searchQuery, initialCategory = 'All', ini
               <div className="flex items-center justify-between mb-4 px-2">
                 <div className="flex items-center gap-3">
                   <div className="h-8 w-1 bg-blue-600 rounded-full"></div>
-                  <h3 className="font-black text-lg text-emerald tracking-tight">Explore {category}</h3>
+                  <h3 className="font-black text-lg text-emerald-700 dark:text-emerald-400 tracking-tight">Explore {category}</h3>
                   <span className="bg-gray-100 text-gray-500 text-[10px] font-black px-2 py-0.5 rounded-md uppercase">{categoriesData[category].length} Varieties</span>
                 </div>
               </div>

@@ -105,17 +105,17 @@ export default function CartPage({ cartItems, onUpdateQuantity, onRemove, onNavi
                     </div>
 
                     <div className="flex items-center justify-between sm:justify-end gap-6">
-                      <div className="flex items-center bg-gray-50 rounded-2xl p-1.5 border border-gray-100 shadow-inner">
+                      <div className="flex items-center bg-gray-50 dark:bg-white/5 rounded-2xl p-1.5 border border-gray-100 dark:border-white/10 shadow-inner">
                         <button 
                           onClick={() => onUpdateQuantity(item.id, -1)} 
-                          className="w-10 h-10 rounded-xl bg-white text-gray-900 font-black shadow-sm hover:bg-emerald-600 hover:text-white transition-all active:scale-90"
+                          className="w-10 h-10 rounded-xl bg-white dark:bg-emerald-600 text-gray-900 dark:text-white font-black shadow-sm hover:bg-emerald-600 hover:text-white transition-all active:scale-90"
                         >
                           -
                         </button>
-                        <span className="w-12 text-center font-black text-gray-900 text-lg">{item.quantity}</span>
+                        <span className="w-12 text-center font-black text-gray-900 dark:text-white text-lg">{item.quantity}</span>
                         <button 
                           onClick={() => onUpdateQuantity(item.id, 1)} 
-                          className="w-10 h-10 rounded-xl bg-white text-gray-900 font-black shadow-sm hover:bg-emerald-600 hover:text-white transition-all active:scale-90"
+                          className="w-10 h-10 rounded-xl bg-white dark:bg-emerald-600 text-gray-900 dark:text-white font-black shadow-sm hover:bg-emerald-600 hover:text-white transition-all active:scale-90"
                         >
                           +
                         </button>

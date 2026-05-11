@@ -33,6 +33,9 @@ app.use('/api/upload', require('./routes/uploads'));
 app.use('/api/orders', require('./routes/orders'));
 app.use('/api/subcategories', require('./routes/subcategories'));
 app.use('/api/reviews', require('./routes/reviews'));
+app.use('/api/cashcollectors', require('./routes/cashCollectors'));
+app.use('/api/contact', require('./routes/contact'));
+
 
 // Base route
 app.get('/', (req, res) => {

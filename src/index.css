@@ -1,5 +1,96 @@
 @import "tailwindcss";
 
+/* Force Tailwind 4 to use class-based dark mode only */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@layer base {
+  .dark {
+    --bg-main: #0a0a0a;
+    --bg-surface: #121212;
+    --bg-surface-light: #1a1a1a;
+    --text-primary: #f3f4f6;
+    --text-secondary: #9ca3af;
+    --border-color: rgba(255, 255, 255, 0.08);
+  }
+
+  /* Force Dark Mode Overrides for hardcoded utility classes */
+  .dark .bg-white, 
+  .dark .bg-\[white\],
+  .dark .bg-white\/70,
+  .dark .bg-white\/90,
+  .dark .bg-white\/95,
+  .dark .bg-white\/10 {
+    background-color: var(--bg-surface) !important;
+  }
+
+  .dark .bg-gray-50,
+  .dark .bg-gray-50\/50,
+  .dark .bg-gray-50\/30,
+  .dark .bg-emerald-50,
+  .dark .bg-amber-50,
+  .dark .bg-yellow-50,
+  .dark .bg-\[\#f8f9fa\],
+  .dark .bg-\[\#fcfdfd\] {
+    background-color: var(--bg-surface-light) !important;
+  }
+
+  .dark .text-gray-900,
+  .dark .text-gray-800 {
+    color: var(--text-primary) !important;
+  }
+
+  .dark .text-gray-600,
+  .dark .text-gray-500,
+  .dark .text-gray-400 {
+    color: var(--text-secondary) !important;
+  }
+
+  .dark .border-gray-100,
+  .dark .border-gray-50,
+  .dark .border-white\/20 {
+    border-color: var(--border-color) !important;
+  }
+
+  .dark input, 
+  .dark textarea, 
+  .dark select {
+    background-color: var(--bg-surface-light) !important;
+    color: var(--text-primary) !important;
+    border-color: var(--border-color) !important;
+  }
+
+  .dark .shadow-sm,
+  .dark .shadow-md,
+  .dark .shadow-lg,
+  .dark .shadow-xl,
+  .dark .shadow-2xl {
+    box-shadow: 0 10px 30px -10px rgba(0,0,0,0.5) !important;
+  }
+
+  .dark .text-black:not(.text-black-force) {
+    color: var(--text-primary) !important;
+  }
+
+  .theme-navbar {
+    background-color: #ffffff;
+  }
+
+  .dark .theme-navbar {
+    background-color: rgba(10, 10, 10, 0.7) !important;
+  }
+}
+
+/* Global Logo Theme Control */
+.logo-theme {
+  filter: brightness(0) !important;
+}
+
+.dark .logo-theme {
+  filter: none !important;
+}
+
+
+
 @layer utilities {
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
@@ -7,5 +98,20 @@
   .scrollbar-hide {
     -ms-overflow-style: none;
     scrollbar-width: none;
+  }
+
+  @keyframes scaleIn {
+    from { opacity: 0; transform: scale(0.9) translateY(10px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes slideDown {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
   }
 }

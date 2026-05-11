@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Package, Calendar, Clock, ChevronRight, ShoppingBag, ArrowLeft, CheckCircle2, Truck, AlertCircle, MapPin, Receipt, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react';
+import { Package, Calendar, Clock, ChevronRight, ShoppingBag, ArrowLeft, CheckCircle2, Truck, AlertCircle, MapPin, Receipt, ExternalLink, ChevronDown, ChevronUp, User, Phone, Camera, Upload, X } from 'lucide-react';
 import { API_URL, API_BASE_URL, IMAGE_BASE_URL } from '../config';
 
 export default function OrdersPage({ onNavigate }) {
@@ -7,8 +7,23 @@ export default function OrdersPage({ onNavigate }) {
   const [loading, setLoading] = useState(true);
   const [expandedOrder, setExpandedOrder] = useState(null);
 
+
+
     const apiBase = API_BASE_URL;
     const uploadBase = API_BASE_URL;
+
+  const [returnModal, setReturnModal] = useState({ open: false, order: null });
+  const [returnForm, setReturnForm] = useState({ selectedReason: '', comment: '', image: null, preview: null });
+  const [submittingReturn, setSubmittingReturn] = useState(false);
+
+  const RETURN_REASONS = [
+    "Damaged product",
+    "Wrong item delivered",
+    "Quality not as expected",
+    "Expired product",
+    "Item missing",
+    "Other"
+  ];
 
   useEffect(() => {
     const fetchOrders = async () => {
@@ -31,28 +46,96 @@ export default function OrdersPage({ onNavigate }) {
     fetchOrders();
   }, []);
 
-  const updateOrderStatus = async (orderId, newStatus) => {
+  const updateOrderStatus = async (orderId, newStatus, returnData = null) => {
     try {
+      const body = { status: newStatus };
+      if (returnData) {
+        body.returnReason = returnData.reason;
+        body.returnComment = returnData.comment;
+        body.returnImage = returnData.image;
+      }
+
       const response = await fetch(`${API_URL}/orders/${orderId}/status`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
-        body: JSON.stringify({ status: newStatus })
+        body: JSON.stringify(body)
       });
 
       if (response.ok) {
         // Refresh orders after update
         const updatedOrders = orders.map(order => 
-          order._id === orderId ? { ...order, orderStatus: newStatus } : order
+          order._id === orderId ? { ...order, orderStatus: newStatus, ...returnData } : order
         );
         setOrders(updatedOrders);
+        return true;
       }
     } catch (err) {
       console.error('Failed to update order status:', err);
+      return false;
     }
   };
+
+  const handleReturnSubmit = async (e) => {
+    e.preventDefault();
+    if (!returnForm.selectedReason) return alert('Please select a reason for return');
+    if (!returnForm.image) return alert('Please upload an evidence photo');
+    
+    setSubmittingReturn(true);
+    let imageUrl = '';
+
+    try {
+      // 1. Upload Image if exists
+      if (returnForm.image) {
+        const formData = new FormData();
+        formData.append('file', returnForm.image);
+        const uploadRes = await fetch(`${API_BASE_URL}/api/upload`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
+          body: formData
+        });
+        const uploadData = await uploadRes.json();
+        if (uploadRes.ok) imageUrl = `${IMAGE_BASE_URL}${uploadData.url}`;
+      }
+
+      // 2. Update Order Status to Returned with separate reason, comment and image
+      const success = await updateOrderStatus(returnModal.order._id, 'Returned', {
+        reason: returnForm.selectedReason,
+        comment: returnForm.comment,
+        image: imageUrl
+      });
+
+      if (success) {
+        setReturnModal({ open: false, order: null });
+        setReturnForm({ selectedReason: '', comment: '', image: null, preview: null });
+      }
+    } catch (err) {
+      console.error('Return failed:', err);
+    } finally {
+      setSubmittingReturn(false);
+    }
+  };
+
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setReturnForm({
+        ...returnForm,
+        image: file,
+        preview: URL.createObjectURL(file)
+      });
+    }
+  };
+
+  const toggleOrderExpansion = (orderId) => {
+    setExpandedOrder(expandedOrder === orderId ? null : orderId);
+  };
+
+
 
   const canReturn = (order) => {
     if (order.orderStatus !== 'Delivered') return false;
@@ -208,12 +291,14 @@ export default function OrdersPage({ onNavigate }) {
                         )}
                       </div>
                       <button 
-                        onClick={() => setExpandedOrder(expandedOrder === order._id ? null : order._id)}
+                        onClick={() => toggleOrderExpansion(order._id)}
                         className="flex items-center gap-2 px-6 py-2.5 bg-emerald-50 text-emerald-700 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-600 hover:text-white transition-all shadow-sm"
                       >
+
                         {expandedOrder === order._id ? 'Hide Details' : 'View Details'}
                         {expandedOrder === order._id ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                       </button>
+
                     </div>
                   </div>
                 </div>
@@ -222,7 +307,7 @@ export default function OrdersPage({ onNavigate }) {
                 {expandedOrder === order._id && (
                   <div className="border-t border-emerald-50 bg-emerald-50/20 animate-[slideDown_0.3s_ease-out]">
                     <div className="p-6 md:p-8 space-y-6">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                      <div className={`grid grid-cols-1 ${order.cashPersonId ? 'md:grid-cols-3' : 'md:grid-cols-2'} gap-8`}>
                         {/* Delivery Info */}
                         <div className="space-y-4">
                           <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
@@ -278,7 +363,7 @@ export default function OrdersPage({ onNavigate }) {
                               
                               {order.orderStatus === 'Delivered' && canReturn(order) && (
                                 <button 
-                                  onClick={() => updateOrderStatus(order._id, 'Returned')}
+                                  onClick={() => setReturnModal({ open: true, order })}
                                   className="w-full py-3 bg-amber-50 text-amber-700 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-amber-600 hover:text-white transition-all"
                                 >
                                   Return Order (3 Days Left)
@@ -287,7 +372,38 @@ export default function OrdersPage({ onNavigate }) {
                             </div>
                           </div>
                         </div>
+
+                        {/* Cash Collector Info */}
+                        {order.cashPersonId && typeof order.cashPersonId === 'object' && (
+                          <div className="space-y-4">
+                            <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                              <User size={14} className="text-emerald-500" />
+                              Cash Collector Details
+                            </h3>
+                            <div className="bg-white p-5 rounded-3xl border border-emerald-100 shadow-sm">
+                              <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 bg-emerald-100 rounded-2xl flex items-center justify-center text-emerald-700 font-black">
+                                  {order.cashPersonId.name?.charAt(0) || 'C'}
+                                </div>
+                                <div>
+                                  <p className="font-black text-gray-900 mb-0.5">{order.cashPersonId.name}</p>
+                                  <p className="text-emerald-600 text-sm font-black flex items-center gap-2">
+                                    <Phone size={12} />
+                                    {order.cashPersonId.phone}
+                                  </p>
+                                  {order.cashPersonId.email && (
+                                    <p className="text-gray-400 text-[10px] font-bold mt-1 uppercase tracking-widest">
+                                      {order.cashPersonId.email}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
+
+
 
                       {/* Item List */}
                       <div className="space-y-4">
@@ -317,6 +433,110 @@ export default function OrdersPage({ onNavigate }) {
           </div>
         )}
       </div>
+
+      {/* Return Request Modal */}
+      {returnModal.open && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => !submittingReturn && setReturnModal({ open: false, order: null })}></div>
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-xl relative z-10 overflow-hidden animate-[scaleIn_0.2s_ease-out]">
+            <div className="bg-white p-6 border-b border-gray-100 flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-bold text-gray-900">Return Request</h2>
+                <p className="text-gray-500 text-xs font-medium mt-0.5">Order #{returnModal.order?._id.slice(-6).toUpperCase()}</p>
+              </div>
+              <button 
+                onClick={() => setReturnModal({ open: false, order: null })}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-gray-400"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            
+            <form onSubmit={handleReturnSubmit} className="p-6 space-y-5">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-gray-700 ml-0.5">Reason for Return</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {RETURN_REASONS.map(reason => (
+                    <button
+                      key={reason}
+                      type="button"
+                      onClick={() => setReturnForm({ ...returnForm, selectedReason: reason })}
+                      className={`px-3 py-2 rounded-xl text-[10px] font-bold border transition-all ${returnForm.selectedReason === reason ? 'bg-amber-500 border-amber-500 text-white shadow-lg shadow-amber-500/20' : 'bg-gray-50 border-gray-100 text-gray-500 hover:bg-gray-100'}`}
+                    >
+                      {reason}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-gray-700 ml-0.5">Additional Details (Optional)</label>
+                <textarea 
+                  rows="2"
+                  value={returnForm.comment}
+                  onChange={(e) => setReturnForm({ ...returnForm, comment: e.target.value })}
+                  placeholder="Any extra info to help us understand..."
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:border-amber-500 outline-none transition-all text-sm text-gray-800 resize-none"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-gray-700 ml-0.5">Evidence Photo <span className="text-red-500">*Required</span></label>
+                <div className="relative">
+                  {returnForm.preview ? (
+                    <div className="relative rounded-xl overflow-hidden border border-gray-200 group">
+                      <img src={returnForm.preview} alt="Preview" className="w-full h-32 object-cover" />
+                      <button 
+                        type="button"
+                        onClick={() => setReturnForm({ ...returnForm, image: null, preview: null })}
+                        className="absolute top-2 right-2 bg-black/60 text-white p-1.5 rounded-lg hover:bg-red-500 transition-colors"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="flex items-center gap-4 p-4 border border-dashed border-gray-300 rounded-xl bg-gray-50 hover:bg-amber-50 hover:border-amber-200 transition-all cursor-pointer group">
+                      <div className="w-10 h-10 bg-white rounded-lg shadow-sm flex items-center justify-center text-gray-400 group-hover:text-amber-500 transition-colors">
+                        <Camera size={20} />
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-gray-700">Add a photo</p>
+                        <p className="text-[10px] text-gray-400">Helps us process your request faster</p>
+                      </div>
+                      <input type="file" className="hidden" accept="image/*" onChange={handleImageChange} />
+                    </label>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button 
+                  type="button"
+                  disabled={submittingReturn}
+                  onClick={() => setReturnModal({ open: false, order: null })}
+                  className="flex-1 py-3 border border-gray-200 text-gray-600 font-bold rounded-xl hover:bg-gray-50 transition-all text-sm"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit"
+                  disabled={submittingReturn || !returnForm.selectedReason || !returnForm.image}
+                  className="flex-[2] py-3 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl shadow-lg shadow-amber-500/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:grayscale text-sm"
+                >
+                  {submittingReturn ? (
+                    <div className="w-5 h-5 border-3 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <Upload size={16} />
+                      Submit Request
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

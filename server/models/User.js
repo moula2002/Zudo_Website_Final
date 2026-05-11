@@ -29,7 +29,9 @@ const userSchema = new mongoose.Schema({
     lat: Number,
     lng: Number,
     isDefault: { type: Boolean, default: false }
-  }]
+  }],
+  resetPasswordToken: String,
+  resetPasswordExpires: Date
 }, { timestamps: true });
 
 userSchema.index({ email: 1, role: 1 }, { unique: true });

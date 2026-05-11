@@ -19,6 +19,7 @@ import CheckoutPage from './components/CheckoutPage';
 import ProfilePage from './components/ProfilePage';
 import OrdersPage from './components/OrdersPage';
 import PolicyPage from './components/PolicyPage';
+import ResetPasswordPage from './components/ResetPasswordPage';
 import { API_URL, API_BASE_URL } from './config';
 import './App.css';
 
@@ -41,6 +42,10 @@ function App() {
   const [isB2B, setIsB2B] = useState(false);
   const [b2bStatus, setB2bStatus] = useState('none');
   const [connectionError, setConnectionError] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    const savedTheme = localStorage.getItem('theme');
+    return savedTheme === 'dark';
+  });
 
   // Load user from storage immediately
   const loadUserFromStorage = () => {
@@ -61,7 +66,44 @@ function App() {
     loadUserFromStorage();
     const handleLoginEvent = () => loadUserFromStorage();
     window.addEventListener('user-login-success', handleLoginEvent);
-    return () => window.removeEventListener('user-login-success', handleLoginEvent);
+
+    // Handle Route Detection on Refresh
+    const path = window.location.pathname;
+    if (path === '/') {
+      setCurrentPage('home');
+    } else if (path.startsWith('/reset-password/')) {
+      const savedUser = localStorage.getItem('user');
+      if (savedUser) {
+        window.history.pushState({}, '', '/');
+        setCurrentPage('home');
+      } else {
+        setCurrentPage('resetPassword');
+      }
+    } else {
+      // Map kebab-case URL to camelCase page state
+      const page = path.slice(1).replace(/-([a-z])/g, (g) => g[1].toUpperCase());
+      const validPages = ['products', 'productDetails', 'cart', 'wishlist', 'checkout', 'profile', 'orders', 'contact', 'terms', 'privacy', 'shipping', 'returns', 'resetPassword'];
+      if (validPages.includes(page)) {
+        setCurrentPage(page);
+      }
+    }
+
+    const handlePopState = (event) => {
+      if (event.state && event.state.page) {
+        setCurrentPage(event.state.page);
+        if (event.state.tab) setProfileTab(event.state.tab);
+      } else {
+        const path = window.location.pathname;
+        const page = path === '/' ? 'home' : path.slice(1).replace(/-([a-z])/g, (g) => g[1].toUpperCase());
+        setCurrentPage(page || 'home');
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('user-login-success', handleLoginEvent);
+      window.removeEventListener('popstate', handlePopState);
+    };
   }, []);
 
   useEffect(() => {
@@ -77,8 +119,13 @@ function App() {
 
         if (profileRes && profileRes.ok) {
           const latestUser = await profileRes.json();
-          setUser(latestUser);
-          localStorage.setItem('user', JSON.stringify(latestUser));
+          // Ensure profileImage is set for frontend consistency
+          const mappedUser = {
+            ...latestUser,
+            profileImage: latestUser.profilePicture || latestUser.profileImage
+          };
+          setUser(mappedUser);
+          localStorage.setItem('user', JSON.stringify(mappedUser));
         } else if (profileRes && profileRes.status === 401) {
           handleLogout();
         }
@@ -156,9 +203,48 @@ function App() {
     fetchInitialData();
   }, []);
 
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+    }
+  }, [isDarkMode]);
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [currentPage]);
+
+  const toggleTheme = () => setIsDarkMode(!isDarkMode);
+
   const handleNavigate = (page, tab = 'profile') => {
+    // 1. Force Login for Checkout
+    if (page === 'checkout' && !user) {
+      setIsLoginOpen(true);
+      showToast('Please login to proceed to checkout.');
+      return;
+    }
+
+    // 2. Intercept cart/checkout for B2B users who haven't uploaded docs
+    const isBusiness = user?.role === 'business' || user?.role === 'b2b' || user?.role === 'seller';
+    const hasDocs = user?.gstPdf || user?.storePic;
+    
+    if ((page === 'cart' || page === 'checkout') && isBusiness && !user?.isVerified && !hasDocs) {
+      setB2bStatus('pending');
+      showToast('Please complete verification to access cart.');
+      return;
+    }
+
     setCurrentPage(page);
     if (page === 'profile') setProfileTab(tab);
+
+    // Update URL without refreshing
+    const path = page === 'home' ? '/' : `/${page.replace(/([A-Z])/g, '-$1').toLowerCase()}`;
+    if (window.location.pathname !== path) {
+      window.history.pushState({ page, tab }, '', path);
+    }
   };
 
   useEffect(() => {
@@ -166,7 +252,7 @@ function App() {
     setIsB2B(isBusiness);
 
     if (isBusiness) {
-      const hasDocs = user.gstPdf || user.storePic || user.businessName;
+      const hasDocs = user.gstPdf || user.storePic;
       if (user.isVerified) {
         setB2bStatus('approved');
       } else if (!hasDocs) {
@@ -202,7 +288,17 @@ function App() {
 
   const updateCartQuantity = (id, delta) => {
     setCartItems(prev => prev.map(item => {
-      if (item.id === id) return { ...item, quantity: Math.max(0, item.quantity + delta) };
+      if (item.id === id) {
+        const minQty = (isB2B && item.moq) ? item.moq : 0;
+        const newQty = item.quantity + delta;
+        
+        // If it's a B2B item and we're trying to go below MOQ, remove it
+        if (isB2B && item.moq && newQty < item.moq && delta < 0) {
+          return { ...item, quantity: 0 };
+        }
+        
+        return { ...item, quantity: Math.max(0, newQty) };
+      }
       return item;
     }).filter(item => item.quantity > 0));
   };
@@ -246,7 +342,7 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f8f9fa] text-gray-900 font-sans overflow-x-hidden relative flex flex-col">
+    <div className="min-h-screen bg-[#f8f9fa] dark:bg-[#0a0a0a] text-gray-900 dark:text-white font-sans overflow-x-hidden relative flex flex-col transition-colors duration-500">
       {connectionError && (
         <div className="fixed top-0 left-0 right-0 z-[9999] bg-red-600 text-white text-center py-3 font-black text-xs uppercase tracking-widest animate-pulse shadow-lg">
           ⚠️ BACKEND CONNECTION FAILED (Localhost:5000)
@@ -267,6 +363,8 @@ function App() {
         subcategories={subcategories}
         allProducts={allProducts}
         onLogout={handleLogout}
+        isDarkMode={isDarkMode}
+        toggleTheme={toggleTheme}
       />
       
       {b2bStatus === 'pending' && (
@@ -294,14 +392,14 @@ function App() {
                     <div className="absolute top-[40%] left-[30%] w-[400px] h-[400px] rounded-full bg-teal-400/20 blur-[100px] mix-blend-screen"></div>
                   </div>
                   <div className="relative z-10">
-                    <Hero onNavigate={setCurrentPage} />
+                    <Hero onNavigate={handleNavigate} />
                   </div>
                 </div>
-                <TopCategories onNavigate={setCurrentPage} onCategoryClick={handleCategoryClick} categories={categories} />
+                <TopCategories onNavigate={handleNavigate} onCategoryClick={handleCategoryClick} categories={categories} />
                 <Showcase />
-                <HomeProducts onAddToCart={addToCart} onUpdateQuantity={updateCartQuantity} onToggleWishlist={toggleWishlist} cartItems={cartItems} wishlistItems={wishlistItems} onNavigateToProduct={navigateToProduct} onNavigate={setCurrentPage} isB2B={isB2B} getDisplayPrice={getDisplayPrice} allProducts={allProducts} />
-                <PromoBanner onNavigate={setCurrentPage} />
-                <HomeNeeds onAddToCart={addToCart} onUpdateQuantity={updateCartQuantity} onToggleWishlist={toggleWishlist} cartItems={cartItems} wishlistItems={wishlistItems} onNavigateToProduct={navigateToProduct} onNavigate={setCurrentPage} isB2B={isB2B} getDisplayPrice={getDisplayPrice} allProducts={allProducts} />
+                <HomeProducts onAddToCart={addToCart} onUpdateQuantity={updateCartQuantity} onToggleWishlist={toggleWishlist} cartItems={cartItems} wishlistItems={wishlistItems} onNavigateToProduct={navigateToProduct} onNavigate={handleNavigate} isB2B={isB2B} getDisplayPrice={getDisplayPrice} allProducts={allProducts} />
+                <PromoBanner onNavigate={handleNavigate} />
+                <HomeNeeds onAddToCart={addToCart} onUpdateQuantity={updateCartQuantity} onToggleWishlist={toggleWishlist} cartItems={cartItems} wishlistItems={wishlistItems} onNavigateToProduct={navigateToProduct} onNavigate={handleNavigate} isB2B={isB2B} getDisplayPrice={getDisplayPrice} allProducts={allProducts} />
                 <Testimonials />
               </>
             )}
@@ -331,7 +429,7 @@ function App() {
                 onAddToCart={addToCart}
                 onToggleWishlist={toggleWishlist}
                 isWishlisted={wishlistItems.some(item => item.id === selectedProduct?.id)}
-                onNavigate={setCurrentPage}
+                onNavigate={handleNavigate}
                 onNavigateToProduct={navigateToProduct}
                 wishlistItems={wishlistItems}
                 cartItems={cartItems}
@@ -343,23 +441,24 @@ function App() {
               />
             )}
 
-            {currentPage === 'cart' && <CartPage cartItems={cartItems} onUpdateQuantity={updateCartQuantity} onRemove={removeFromCart} onNavigate={setCurrentPage} isB2B={isB2B} />}
-            {currentPage === 'wishlist' && <WishlistPage wishlistItems={wishlistItems} cartItems={cartItems} onAddToCart={addToCart} onUpdateQuantity={updateCartQuantity} onToggleWishlist={toggleWishlist} onNavigate={setCurrentPage} onNavigateToProduct={navigateToProduct} />}
-            {currentPage === 'checkout' && <CheckoutPage cartItems={cartItems} user={user} onNavigate={setCurrentPage} onOrderSuccess={() => { setCartItems([]); showToast('Order placed!'); setCurrentPage('home'); }} />}
+            {currentPage === 'cart' && <CartPage cartItems={cartItems} onUpdateQuantity={updateCartQuantity} onRemove={removeFromCart} onNavigate={handleNavigate} isB2B={isB2B} />}
+            {currentPage === 'wishlist' && <WishlistPage wishlistItems={wishlistItems} cartItems={cartItems} onAddToCart={addToCart} onUpdateQuantity={updateCartQuantity} onToggleWishlist={toggleWishlist} onNavigate={handleNavigate} onNavigateToProduct={navigateToProduct} />}
+            {currentPage === 'checkout' && <CheckoutPage cartItems={cartItems} user={user} onNavigate={handleNavigate} onOrderSuccess={() => { setCartItems([]); showToast('Order placed!'); handleNavigate('home'); }} />}
             {currentPage === 'profile' && <ProfilePage user={user} onUpdateUser={setUser} onNavigate={handleNavigate} initialTab={profileTab} />}
-            {currentPage === 'orders' && <OrdersPage onNavigate={setCurrentPage} />}
+            {currentPage === 'orders' && <OrdersPage onNavigate={handleNavigate} />}
             {currentPage === 'contact' && <ContactPage />}
             
             {/* Policy Pages */}
-            {currentPage === 'terms' && <PolicyPage type="terms" onNavigate={setCurrentPage} />}
-            {currentPage === 'privacy' && <PolicyPage type="privacy" onNavigate={setCurrentPage} />}
-            {currentPage === 'shipping' && <PolicyPage type="shipping" onNavigate={setCurrentPage} />}
-            {currentPage === 'returns' && <PolicyPage type="returns" onNavigate={setCurrentPage} />}
+            {currentPage === 'terms' && <PolicyPage type="terms" onNavigate={handleNavigate} />}
+            {currentPage === 'privacy' && <PolicyPage type="privacy" onNavigate={handleNavigate} />}
+            {currentPage === 'shipping' && <PolicyPage type="shipping" onNavigate={handleNavigate} />}
+            {currentPage === 'returns' && <PolicyPage type="returns" onNavigate={handleNavigate} />}
+            {currentPage === 'resetPassword' && <ResetPasswordPage onNavigate={handleNavigate} />}
           </>
         )}
       </div>
 
-      <Footer onNavigate={setCurrentPage} />
+      <Footer onNavigate={handleNavigate} />
       {isLoginOpen && <LoginModal onClose={() => setIsLoginOpen(false)} setUser={setUser} />}
 
       {toastMessage && (
