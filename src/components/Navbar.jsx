@@ -131,7 +131,7 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, onLoginClick,
                              <h3 className="text-lg font-black text-gray-900 tracking-tight leading-none mb-1">{activeMegaCategory}</h3>
                              <div className="h-1 w-6 bg-emerald-500 rounded-full"></div>
                            </div>
-                           <button onClick={() => onCategoryClick(activeMegaCategory)} className="px-4 py-2 bg-emerald-600/10 text-emerald-700 text-[9px] font-black uppercase rounded-lg hover:bg-emerald-600 hover:text-white transition-all tracking-widest">View All</button>
+                           <button onClick={() => onCategoryClick(activeMegaCategory)} className="px-4 py-2 bg-emerald-600/10 text-emerald-700 text-[9px] font-black uppercase rounded-lg hover:bg-emerald-600 hover:text-white transition-all tracking-widest cursor-pointer">View All</button>
                          </div>
                          <div className="grid grid-cols-2 gap-4">
                            {megaData[activeMegaCategory]?.items?.map(item => (
@@ -179,19 +179,19 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, onLoginClick,
                     <div className="absolute top-full left-0 w-full mt-2 bg-white rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.15)] border border-gray-50 overflow-hidden z-[60]">
                       {suggestions.length > 0 ? (
                         <div className="divide-y divide-gray-50">
-                          {suggestions.map(prod => (
-                            <button 
-                              key={prod.id} 
-                              onClick={() => handleSuggestionClick(prod)} 
-                              className="w-full flex items-center gap-4 p-4 hover:bg-emerald-50 transition-colors text-left"
-                            >
-                              <img src={prod.image} alt={prod.name} className="w-12 h-12 rounded-lg object-cover border border-gray-100" />
-                              <div className="flex-1">
-                                <div className="text-sm font-black text-gray-900">{prod.name}</div>
-                                <div className="text-xs text-emerald-600 font-black mt-0.5">₹{prod.price}</div>
-                              </div>
-                            </button>
-                          ))}
+                           {suggestions.map(prod => (
+                             <button 
+                               key={prod.id} 
+                               onClick={() => handleSuggestionClick(prod)} 
+                               className="w-full flex items-center gap-4 p-4 hover:bg-emerald-50 transition-colors text-left cursor-pointer"
+                             >
+                               <img src={prod.image} alt={prod.name} className="w-12 h-12 rounded-lg object-cover border border-gray-100" />
+                               <div className="flex-1">
+                                 <div className="text-sm font-black text-gray-900">{prod.name}</div>
+                                 <div className="text-xs text-emerald-600 font-black mt-0.5">₹{prod.price}</div>
+                               </div>
+                             </button>
+                           ))}
                         </div>
                       ) : (
                         <div className="p-8 text-center text-gray-400 font-bold italic text-sm">No results found</div>
