@@ -30,6 +30,7 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, onLoginClick,
 
     acc[cat.name] = {
       icon,
+      img: (cat.image || cat.imageUrl)?.startsWith('http') ? (cat.image || cat.imageUrl) : (cat.image || cat.imageUrl ? `${IMAGE_BASE_URL}${cat.image || cat.imageUrl}` : 'https://images.unsplash.com/photo-1542831371-29b0f74f9713?auto=format&fit=crop&q=80&w=200'),
       items: catSubs.map(sub => ({
         name: sub.name,
         sub: sub.name,
@@ -117,8 +118,8 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, onLoginClick,
                             onClick={() => onCategoryClick(cat)}
                             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-300 ${activeMegaCategory === cat ? 'bg-white shadow-md text-emerald-700 ring-1 ring-emerald-50' : 'text-gray-500 hover:bg-white/50 hover:text-emerald-600'}`}
                           >
-                            <div className={`p-2 rounded-lg transition-colors ${activeMegaCategory === cat ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-400'}`}>
-                              {React.cloneElement(megaData[cat].icon, { size: 14 })}
+                            <div className={`w-8 h-8 rounded-lg overflow-hidden transition-all flex-shrink-0 ${activeMegaCategory === cat ? 'ring-2 ring-emerald-500 ring-offset-2' : 'grayscale'}`}>
+                              <img src={megaData[cat].img} alt={cat} className="w-full h-full object-cover" />
                             </div>
                             <span className="text-[10px] font-black uppercase tracking-wider">{cat}</span>
                           </button>
@@ -433,8 +434,8 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, onLoginClick,
               <div className="grid grid-cols-1 gap-2">
                 {categories.map(cat => (
                   <button key={cat._id} onClick={() => { onCategoryClick(cat.name); setIsMenuOpen(false); }} className="flex items-center gap-4 px-5 py-3 text-sm font-bold text-gray-700 hover:text-emerald-600 transition-all text-left">
-                    <div className="w-8 h-8 bg-gray-50 rounded-lg flex items-center justify-center group-hover:bg-emerald-50">
-                      <ShoppingBag size={14} className="text-gray-400" />
+                    <div className="w-10 h-10 rounded-xl overflow-hidden flex-shrink-0 border border-gray-100">
+                      <img src={(cat.image || cat.imageUrl)?.startsWith('http') ? (cat.image || cat.imageUrl) : (cat.image || cat.imageUrl ? `${IMAGE_BASE_URL}${cat.image || cat.imageUrl}` : 'https://images.unsplash.com/photo-1542831371-29b0f74f9713?auto=format&fit=crop&q=80&w=100')} alt={cat.name} className="w-full h-full object-cover" />
                     </div>
                     {cat.name}
                   </button>
