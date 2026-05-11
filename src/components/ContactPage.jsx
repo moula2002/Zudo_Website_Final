@@ -7,6 +7,7 @@ export default function ContactPage() {
     firstName: '',
     lastName: '',
     email: '',
+    phone: '',
     subject: '',
     message: ''
   });
@@ -29,6 +30,7 @@ export default function ContactPage() {
         body: JSON.stringify({
           name: `${formData.firstName} ${formData.lastName}`.trim(),
           email: formData.email,
+          phone: formData.phone,
           subject: formData.subject,
           message: formData.message
         })
@@ -179,6 +181,18 @@ export default function ContactPage() {
                   onChange={handleChange}
                   placeholder="john@example.com"
                   required
+                  className="w-full bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl px-5 py-3.5 outline-none focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10 transition-all font-medium text-gray-800 dark:text-white placeholder-gray-400"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Phone Number (Optional)</label>
+                <input 
+                  type="tel" 
+                  name="phone"
+                  value={formData.phone}
+                  onChange={handleChange}
+                  placeholder="+91 98765 43210"
                   className="w-full bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl px-5 py-3.5 outline-none focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10 transition-all font-medium text-gray-800 dark:text-white placeholder-gray-400"
                 />
               </div>

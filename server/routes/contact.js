@@ -7,6 +7,12 @@ const nodemailer = require('nodemailer');
 router.post('/', async (req, res) => {
   const { name, email, subject, message, phone } = req.body;
   const customerName = name || 'Valued Customer';
+  const customerEmail = email || 'No email provided';
+  const customerPhone = phone || 'Not provided';
+  const customerSubject = subject || 'No Subject';
+  const customerMessage = message || 'No message content';
+
+  console.log('Contact form submission received:', { name, email, subject, phone });
 
   try {
     // Check if email config exists
@@ -26,7 +32,7 @@ router.post('/', async (req, res) => {
     const adminMailOptions = {
       to: process.env.EMAIL_USER, // Sending to the support email itself
       from: `Zudo Contact Form <${process.env.EMAIL_USER}>`,
-      subject: `New Contact Form Submission: ${subject || 'No Subject'}`,
+      subject: `New Contact Form Submission: ${customerSubject}`,
       html: `
         <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #eee; border-radius: 10px; overflow: hidden;">
           <div style="background-color: #059669; color: white; padding: 20px; text-align: center;">
@@ -34,12 +40,12 @@ router.post('/', async (req, res) => {
           </div>
           <div style="padding: 20px;">
             <p><strong>Name:</strong> ${customerName}</p>
-            <p><strong>Email:</strong> ${email}</p>
-            <p><strong>Phone:</strong> ${phone || 'Not provided'}</p>
-            <p><strong>Subject:</strong> ${subject || 'No Subject'}</p>
+            <p><strong>Email:</strong> ${customerEmail}</p>
+            <p><strong>Phone:</strong> ${customerPhone}</p>
+            <p><strong>Subject:</strong> ${customerSubject}</p>
             <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
             <p><strong>Message:</strong></p>
-            <div style="background-color: #f9f9f9; padding: 15px; border-radius: 5px; white-space: pre-wrap;">${message}</div>
+            <div style="background-color: #f9f9f9; padding: 15px; border-radius: 5px; white-space: pre-wrap;">${customerMessage}</div>
           </div>
           <div style="background-color: #f4f4f4; padding: 10px; text-align: center; font-size: 12px; color: #777;">
             Sent from Zudo Website Contact Form
