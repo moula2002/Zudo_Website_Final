@@ -245,8 +245,19 @@ export default function OrdersPage({ onNavigate }) {
                 <div className="p-6 md:p-8">
                   <div className="flex flex-col md:flex-row gap-6 justify-between">
                     <div className="flex gap-6">
-                      <div className="w-20 h-20 bg-emerald-50 rounded-3xl flex-shrink-0 flex items-center justify-center border border-emerald-100 group-hover:scale-105 transition-transform duration-500">
-                        <Package className="text-emerald-600" size={32} />
+                      <div className="w-20 h-20 bg-emerald-50 rounded-3xl flex-shrink-0 flex flex-col items-center justify-center border border-emerald-100 group-hover:bg-emerald-100 transition-colors duration-500 p-2 text-center">
+                        {order.cashPersonId && typeof order.cashPersonId === 'object' ? (
+                          <>
+                            <div className="text-emerald-700 font-black text-xl leading-none mb-1">
+                              {order.cashPersonId.name?.charAt(0) || 'C'}
+                            </div>
+                            <div className="text-[8px] font-black text-emerald-600 uppercase tracking-tighter truncate w-full">
+                              {order.cashPersonId.name?.split(' ')[0]}
+                            </div>
+                          </>
+                        ) : (
+                          <div className="text-emerald-700 font-black text-xl">Z</div>
+                        )}
                       </div>
                       <div className="space-y-2">
                         <div className="flex items-center flex-wrap gap-3">
@@ -339,9 +350,15 @@ export default function OrdersPage({ onNavigate }) {
                               <span className="font-black text-gray-900">{order.paymentMethod}</span>
                             </div>
                             <div className="flex justify-between items-center text-sm">
-                              <span className="text-gray-500 font-bold">Status</span>
-                              <span className={`px-3 py-1 rounded-full text-[10px] font-black ${order.paymentStatus === 'Completed' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                                {order.paymentStatus}
+                              <span className="text-gray-500 font-bold">Order Status</span>
+                              <span className={`px-3 py-1 rounded-full text-[10px] font-black ${
+                                order.orderStatus === 'Delivered' ? 'bg-emerald-100 text-emerald-700' : 
+                                order.orderStatus === 'Cancelled' ? 'bg-red-100 text-red-700' :
+                                order.orderStatus === 'Shipped' ? 'bg-blue-100 text-blue-700' :
+                                order.orderStatus === 'Returned' ? 'bg-purple-100 text-purple-700' :
+                                'bg-amber-100 text-amber-700'
+                              }`}>
+                                {order.orderStatus}
                               </span>
                             </div>
                             <div className="h-px bg-gray-100 my-2"></div>
