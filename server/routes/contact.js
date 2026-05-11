@@ -6,6 +6,7 @@ const nodemailer = require('nodemailer');
 // @desc    Send contact form message via email
 router.post('/', async (req, res) => {
   const { name, email, subject, message, phone } = req.body;
+  const customerName = name || 'Valued Customer';
 
   try {
     // Check if email config exists
@@ -32,7 +33,7 @@ router.post('/', async (req, res) => {
             <h1 style="margin: 0;">New Inquiry</h1>
           </div>
           <div style="padding: 20px;">
-            <p><strong>Name:</strong> ${name}</p>
+            <p><strong>Name:</strong> ${customerName}</p>
             <p><strong>Email:</strong> ${email}</p>
             <p><strong>Phone:</strong> ${phone || 'Not provided'}</p>
             <p><strong>Subject:</strong> ${subject || 'No Subject'}</p>
@@ -55,7 +56,7 @@ router.post('/', async (req, res) => {
       html: `
         <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #eee; border-radius: 10px; overflow: hidden;">
           <div style="background-color: #059669; color: white; padding: 20px; text-align: center;">
-            <h1 style="margin: 0;">Hello ${name}!</h1>
+            <h1 style="margin: 0;">Hello ${customerName}!</h1>
           </div>
           <div style="padding: 20px;">
             <p>Thank you for reaching out to Zudo. We have received your inquiry and our team will get back to you as soon as possible.</p>
