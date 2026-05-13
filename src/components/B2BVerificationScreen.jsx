@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ShieldCheck, Clock, FileText, ArrowRight, CheckCircle2, X, Upload, FileUp, AlertCircle, Camera, CreditCard } from 'lucide-react';
-import { API_URL, API_BASE_URL } from '../config';
+import { API_URL, IMAGE_BASE_URL } from '../config';
 
 export default function B2BVerificationScreen({ onSkip, onBack, user, onUpdateUser }) {
   const [uploading, setUploading] = useState({ doc: false, store: false, submitting: false });
@@ -10,8 +10,6 @@ export default function B2BVerificationScreen({ onSkip, onBack, user, onUpdateUs
   const [taxType, setTaxType] = useState('gst');
   const [error, setError] = useState('');
   const [status, setStatus] = useState(user?.gstPdf ? 'uploaded' : 'pending');
-
-  const HOSTINGER_BASE = API_BASE_URL;
 
   const handleFileUpload = async (e, type) => {
     const file = e.target.files[0];
@@ -26,15 +24,23 @@ export default function B2BVerificationScreen({ onSkip, onBack, user, onUpdateUs
     try {
       console.log(`STEP 1: Uploading ${type} to HOSTINGER storage...`);
       // User specifically requested Hostinger for uploads
-      const response = await fetch(`${HOSTINGER_BASE}/api/upload`, {
+      const selectedCity = localStorage.getItem('selectedCity');
+      const savedTenantId = localStorage.getItem('zudo_tenant_id');
+      const locationHeader = savedTenantId || selectedCity || '';
+
+      const response = await fetch(`${IMAGE_BASE_URL}/api/upload`, {
         method: 'POST',
+        headers: {
+          'x-location': locationHeader,
+          'x-tenant-id': locationHeader
+        },
         body: formData
       });
 
       const data = await response.json();
       if (!response.ok) throw new Error(data.message || 'Upload failed');
 
-      const savedUrl = `${HOSTINGER_BASE}${data.url}`;
+      const savedUrl = `${IMAGE_BASE_URL}${data.url}`;
       console.log(`STEP 2: Received HOSTINGER URL:`, savedUrl);
 
       if (type === 'doc') setDocUrl(savedUrl);
@@ -49,8 +55,8 @@ export default function B2BVerificationScreen({ onSkip, onBack, user, onUpdateUs
   };
 
   const handleSubmit = async () => {
-    if (!docUrl || !taxId) {
-      setError('Please provide all required business details.');
+    if (!docUrl || !storePicUrl || !taxId) {
+      setError('Please provide all required business details and both images.');
       return;
     }
 
@@ -69,12 +75,18 @@ export default function B2BVerificationScreen({ onSkip, onBack, user, onUpdateUs
 
       console.log('STEP 4: Saving Hostinger URLs to LOCAL MongoDB User record...', payload);
 
+      const selectedCity = localStorage.getItem('selectedCity');
+      const savedTenantId = localStorage.getItem('zudo_tenant_id');
+      const locationHeader = savedTenantId || selectedCity || '';
+
       // Save to local as requested ("use local host")
       const response = await fetch(`${API_URL}/auth/b2b-verify-submit`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'x-location': locationHeader,
+          'x-tenant-id': locationHeader
         },
         body: JSON.stringify(payload)
       });
@@ -105,12 +117,21 @@ export default function B2BVerificationScreen({ onSkip, onBack, user, onUpdateUs
 
   return (
     <div className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white rounded-[2.5rem] w-full max-w-xl shadow-2xl overflow-hidden animate-[fadeIn_0.3s_ease-out] relative max-h-[95vh] flex flex-col">
-        <button onClick={onBack} className="absolute top-6 right-6 text-gray-400 hover:text-black transition-colors z-10">
-          <X size={24} />
-        </button>
+      <div className="bg-white rounded-[2.5rem] w-full max-w-4xl shadow-2xl overflow-hidden animate-[fadeIn_0.3s_ease-out] relative max-h-[95vh] flex flex-col md:flex-row">
+        {/* Left Branding Side - Desktop Only */}
+        <div className="hidden md:block w-1/3 relative overflow-hidden bg-gray-900">
+          <img src="/zudo_hero.png" className="absolute inset-0 w-full h-full object-cover opacity-60" alt="Zudo Branding" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex flex-col justify-end p-8">
+            <h2 className="text-white text-2xl font-black mb-2">Zudo Business</h2>
+            <p className="text-emerald-400 text-sm font-bold">Direct from source to your storefront.</p>
+          </div>
+        </div>
 
-        <div className="p-8 sm:p-10 overflow-y-auto">
+        <div className="flex-1 p-8 sm:p-10 overflow-y-auto relative bg-white">
+          <button onClick={onBack} className="absolute top-6 right-6 text-gray-400 hover:text-black transition-colors z-10">
+            <X size={24} />
+          </button>
+
           <div className="text-center mb-8">
             <div className="w-16 h-16 bg-emerald-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
               <ShieldCheck size={32} className="text-emerald-600" />
@@ -170,7 +191,7 @@ export default function B2BVerificationScreen({ onSkip, onBack, user, onUpdateUs
                   {error}
                 </div>
               )}
-
+ 
               <button
                 onClick={handleSubmit}
                 disabled={uploading.submitting || uploading.doc || uploading.store}

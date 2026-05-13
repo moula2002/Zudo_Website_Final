@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
+const storage = require('../utils/context');
 
 const userSchema = new mongoose.Schema({
   name: { type: String, required: true },
@@ -45,4 +46,23 @@ userSchema.methods.comparePassword = async function(candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
 };
 
-module.exports = mongoose.model('User', userSchema);
+module.exports = new Proxy(function() {}, {
+  get(target, prop) {
+    try {
+      const context = storage.getStore();
+      const conn = context?.db || mongoose.connection;
+      const model = conn.models['User'] || conn.model('User', userSchema);
+      const value = model[prop];
+      return typeof value === 'function' ? value.bind(model) : value;
+    } catch (err) {
+      console.error(`[CRITICAL] User Model Proxy Error (${prop}):`, err);
+      throw err;
+    }
+  },
+  construct(target, args) {
+    const context = storage.getStore();
+    const conn = context?.db || mongoose.connection;
+    const model = conn.models['User'] || conn.model('User', userSchema);
+    return new model(...args);
+  }
+});

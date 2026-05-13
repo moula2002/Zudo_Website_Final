@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const storage = require('../utils/context');
 
 const reviewSchema = new mongoose.Schema({
   userId: {
@@ -35,4 +36,16 @@ const reviewSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
-module.exports = mongoose.model('Review', reviewSchema);
+module.exports = new Proxy({}, {
+  get(target, prop) {
+    try {
+      const context = storage.getStore();
+      const conn = context?.db || mongoose.connection;
+      if (prop === 'schema') return reviewSchema;
+      return conn.model('Review')[prop];
+    } catch (err) {
+      console.error(`[CRITICAL] Review Model Proxy Error (${prop}):`, err);
+      throw err;
+    }
+  }
+});

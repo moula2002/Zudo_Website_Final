@@ -8,13 +8,24 @@ const { protect } = require('../middleware/auth');
 // @desc    Get all categories with subcategories
 router.get('/', async (req, res) => {
   try {
+    console.log('[DEBUG] Route GET /api/categories called');
     const categories = await Category.find();
+    console.log(`[DEBUG] Found ${categories.length} categories`);
+    
     const result = await Promise.all(categories.map(async (cat) => {
-      const subCats = await SubCategory.find({ categoryId: cat._id });
-      return { ...cat._doc, subCategories: subCats };
+      try {
+        const subCats = await SubCategory.find({ categoryId: cat._id });
+        return { ...cat._doc, subCategories: subCats };
+      } catch (err) {
+        console.error(`[DEBUG] Error fetching subcategories for category ${cat._id}:`, err);
+        return { ...cat._doc, subCategories: [] };
+      }
     }));
+    
+    console.log('[DEBUG] Category mapping complete');
     res.json(result);
   } catch (error) {
+    console.error('[DEBUG] Route GET /api/categories FAILED:', error);
     res.status(500).json({ message: error.message });
   }
 });

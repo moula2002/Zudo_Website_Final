@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CreditCard, Truck, MapPin, Phone, User, CheckCircle2, ChevronRight, ArrowLeft, Search } from 'lucide-react';
+import { CreditCard, Truck, MapPin, Phone, User, CheckCircle2, ChevronRight, ArrowLeft, Search, AlertTriangle } from 'lucide-react';
 import { useLocation } from '../hooks/useLocation';
 import { API_URL } from '../config';
 
@@ -31,12 +31,55 @@ export default function CheckoutPage({ cartItems, onNavigate, user, onOrderSucce
   const shipping = subtotal > 500 ? 0 : 50;
   const total = subtotal + shipping;
 
+  const [pincodeError, setPincodeError] = useState('');
+
+  const checkPincode = async (code) => {
+    if (code.length === 6) {
+      try {
+        const selectedCity = localStorage.getItem('selectedCity');
+        const savedTenantId = localStorage.getItem('zudo_tenant_id');
+        const locationHeader = savedTenantId || selectedCity || '';
+
+        const res = await fetch(`${API_URL}/tenancy/find/${code}`, {
+          headers: {
+            'x-location': locationHeader,
+            'x-tenant-id': locationHeader
+          }
+        });
+        const data = await res.json();
+        
+        if (!res.ok) {
+          setPincodeError('Delivery not available for this location');
+        } else {
+          // Check if the pincode belongs to the currently selected database
+          if (data.dbName !== savedTenantId) {
+            setPincodeError(`This pincode belongs to ${data.city}. Please select ${data.city} at the homepage to shop there.`);
+          } else {
+            setPincodeError('');
+          }
+        }
+      } catch (err) {
+        console.error('Pincode check failed');
+      }
+    } else {
+      setPincodeError('');
+    }
+  };
+
   const handleInputChange = (e) => {
-    setShippingData({ ...shippingData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setShippingData({ ...shippingData, [name]: value });
+    if (name === 'pincode') {
+      checkPincode(value);
+    }
   };
 
   const handlePlaceOrder = async (e) => {
     e.preventDefault();
+    if (pincodeError) {
+      alert('Cannot place order: Delivery is not available for your pincode.');
+      return;
+    }
     setLoading(true);
 
     const isB2B = localStorage.getItem('isB2B') === 'true';
@@ -65,11 +108,17 @@ export default function CheckoutPage({ cartItems, onNavigate, user, onOrderSucce
     };
 
     try {
+      const selectedCity = localStorage.getItem('selectedCity');
+      const savedTenantId = localStorage.getItem('zudo_tenant_id');
+      const locationHeader = savedTenantId || selectedCity || '';
+
       const response = await fetch(`${API_URL}/orders`, {
         method: 'POST',
         headers: { 
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'x-location': locationHeader,
+            'x-tenant-id': locationHeader
         },
         body: JSON.stringify(orderPayload)
       });
@@ -227,18 +276,33 @@ export default function CheckoutPage({ cartItems, onNavigate, user, onOrderSucce
               </div>
               <div>
                 <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Pincode</label>
-                <div className="relative">
-                  <MapPin size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
-                  <input 
-                    type="text" 
-                    name="pincode"
-                    value={shippingData.pincode}
-                    onChange={handleInputChange}
-                    placeholder="6-digit pincode" 
-                    className="w-full pl-12 pr-4 py-3 rounded-xl border border-gray-100 bg-gray-50 focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all font-bold"
-                    required
-                  />
-                </div>
+                  <div className="relative group">
+                    <MapPin size={16} className={`absolute left-4 top-1/2 -translate-y-1/2 transition-colors ${pincodeError ? 'text-red-500' : 'text-gray-400'}`} />
+                    <input 
+                      type="text" 
+                      name="pincode"
+                      value={shippingData.pincode}
+                      onChange={handleInputChange}
+                      placeholder="6-digit pincode" 
+                      className={`w-full pl-12 pr-4 py-3.5 rounded-2xl border-2 transition-all font-black text-sm outline-none ${
+                        pincodeError 
+                          ? 'border-red-100 bg-red-50 text-red-900 placeholder:text-red-300 focus:border-red-500 focus:ring-4 focus:ring-red-500/10' 
+                          : 'border-gray-100 bg-gray-50/50 text-gray-900 focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10'
+                      }`}
+                      required
+                    />
+                    {pincodeError && (
+                      <div className="absolute right-4 top-1/2 -translate-y-1/2 text-red-500 animate-bounce">
+                        <AlertTriangle size={16} />
+                      </div>
+                    )}
+                  </div>
+                  {pincodeError && (
+                    <div className="mt-2 px-4 py-2 bg-red-50 border border-red-100 rounded-xl flex items-center gap-2 animate-[shake_0.4s_ease-in-out]">
+                      <div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
+                      <p className="text-[10px] font-black text-red-600 uppercase tracking-wider leading-none">{pincodeError}</p>
+                    </div>
+                  )}
               </div>
               <div className="md:col-span-2">
                 <div className="flex items-center justify-between mb-2">
@@ -268,6 +332,7 @@ export default function CheckoutPage({ cartItems, onNavigate, user, onOrderSucce
                               lat: loc.lat,
                               lng: loc.lng
                             }));
+                            if (loc.pincode) checkPincode(loc.pincode);
                           }
                         } catch (err) {
                           console.error('Location fetch failed:', err);
@@ -299,6 +364,7 @@ export default function CheckoutPage({ cartItems, onNavigate, user, onOrderSucce
                             lat: addr.lat,
                             lng: addr.lng
                           }));
+                          if (addr.pincode) checkPincode(addr.pincode);
                           setShowSaved(false);
                         }}
                         className="flex items-center justify-between p-3 bg-white border border-gray-100 rounded-xl hover:border-emerald-500 transition-all text-left group"
@@ -425,7 +491,7 @@ export default function CheckoutPage({ cartItems, onNavigate, user, onOrderSucce
 
             <button 
               onClick={handlePlaceOrder}
-              disabled={loading || !shippingData.name || !shippingData.email || !shippingData.phone || !shippingData.address || !shippingData.city || !shippingData.pincode}
+              disabled={loading || !!pincodeError || !shippingData.name || !shippingData.email || !shippingData.phone || !shippingData.address || !shippingData.city || !shippingData.pincode}
               className={`w-full mt-8 bg-emerald-600 hover:bg-emerald-700 text-white font-black py-4 rounded-2xl shadow-xl shadow-emerald-600/30 transform hover:-translate-y-1 transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none`}
             >
               {loading ? (

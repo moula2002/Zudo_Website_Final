@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const storage = require('../utils/context');
 
 const productSchema = new mongoose.Schema({
   name: { type: String, required: true },
@@ -16,4 +17,26 @@ const productSchema = new mongoose.Schema({
   rating: { type: Number, default: 0 }
 }, { timestamps: true });
 
-module.exports = mongoose.model('Product', productSchema);
+module.exports = new Proxy(function() {}, {
+  get(target, prop) {
+    try {
+      const context = storage.getStore();
+      const conn = context?.db || mongoose.connection;
+      if (prop === 'db') return conn.db;
+      if (prop === 'schema') return productSchema;
+      
+      const model = conn.models['Product'] || conn.model('Product', productSchema);
+      const value = model[prop];
+      return typeof value === 'function' ? value.bind(model) : value;
+    } catch (err) {
+      console.error(`[CRITICAL] Product Model Proxy Error (${prop}):`, err);
+      throw err;
+    }
+  },
+  construct(target, args) {
+    const context = storage.getStore();
+    const conn = context?.db || mongoose.connection;
+    const model = conn.models['Product'] || conn.model('Product', productSchema);
+    return new model(...args);
+  }
+});

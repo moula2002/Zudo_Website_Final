@@ -4,6 +4,7 @@ import Hero from './components/Hero';
 import TopCategories from './components/TopCategories';
 import Showcase from './components/Showcase';
 import HomeProducts from './components/HomeProducts';
+import NewArrivals from './components/NewArrivals';
 import HomeNeeds from './components/HomeNeeds';
 import PromoBanner from './components/PromoBanner';
 import Testimonials from './components/Testimonials';
@@ -21,7 +22,15 @@ import OrdersPage from './components/OrdersPage';
 import PolicyPage from './components/PolicyPage';
 import ResetPasswordPage from './components/ResetPasswordPage';
 import { API_URL, API_BASE_URL } from './config';
+import { MapPin } from 'lucide-react';
+import LocationGateway from './components/LocationGateway';
 import './App.css';
+
+const SUPPORTED_MAPPING = {
+  'bangalore': 'zudo-bengaluru',
+  'bengaluru': 'zudo-bengaluru',
+  'mysore': 'zudo-mysore'
+};
 
 function App() {
   const [currentPage, setCurrentPage] = useState('home');
@@ -42,6 +51,7 @@ function App() {
   const [isB2B, setIsB2B] = useState(false);
   const [b2bStatus, setB2bStatus] = useState('none');
   const [connectionError, setConnectionError] = useState(false);
+  const [locationNotAvailable, setLocationNotAvailable] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(() => {
     const savedTheme = localStorage.getItem('theme');
     return savedTheme === 'dark';
@@ -109,12 +119,21 @@ function App() {
   useEffect(() => {
     const syncProfile = async () => {
       const token = localStorage.getItem('token');
-      if (!token) return;
+      const selectedCity = localStorage.getItem('selectedCity');
+      if (!token || !selectedCity) return;
 
       try {
+        const selectedCity = localStorage.getItem('selectedCity');
+        const savedTenantId = localStorage.getItem('zudo_tenant_id');
+        const locationHeader = savedTenantId || selectedCity || '';
+
         // Now using API_URL which is set to localhost
         const profileRes = await fetch(`${API_URL}/auth/profile`, {
-          headers: { 'Authorization': `Bearer ${token}` }
+          headers: { 
+            'Authorization': `Bearer ${token}`,
+            'x-location': locationHeader,
+            'x-tenant-id': locationHeader
+          }
         }).catch(() => null);
 
         if (profileRes && profileRes.ok) {
@@ -137,18 +156,54 @@ function App() {
     const fetchInitialData = async () => {
       try {
         setLoading(true);
+        
+        // Match Navbar's location logic
+        const savedUser = JSON.parse(localStorage.getItem('user') || 'null');
+        const primaryAddress = savedUser?.savedAddresses?.find(addr => addr.isDefault);
+        const liveLocation = JSON.parse(localStorage.getItem('userLocation') || 'null');
+        const liveCity = liveLocation?.city || '';
+        const selectedCity = localStorage.getItem('selectedCity') || '';
+        
+        const savedTenantId = localStorage.getItem('zudo_tenant_id');
+        const locationHeader = savedTenantId || selectedCity || (primaryAddress ? (primaryAddress.city || primaryAddress.address?.split(',')[0]) : (liveCity || 'Bengaluru'));
+                               
+        console.log(`[DEBUG] Fetching data for tenant/city: ${locationHeader}`);
+        
+        // Prepare headers as per documentation
+        const headers = { 
+          'x-location': locationHeader,
+          'x-tenant-id': locationHeader 
+        };
+        
         // Use local API for everything now
         const [prodRes, catRes, subRes] = await Promise.all([
-          fetch(`${API_URL}/products`),
-          fetch(`${API_URL}/categories`),
-          fetch(`${API_URL}/subcategories`)
+          fetch(`${API_URL}/products`, { headers }),
+          fetch(`${API_URL}/categories`, { headers }),
+          fetch(`${API_URL}/subcategories`, { headers })
         ]).catch((e) => {
+          console.error('[DEBUG] Fetch failed:', e);
           setConnectionError(true);
           return [null, null, null];
         });
 
+        if (prodRes && prodRes.status === 404) {
+          const data = await prodRes.json();
+          if (data.message && data.message.includes('not available')) {
+            setLocationNotAvailable(true);
+            setLoading(false);
+            return;
+          }
+        }
+        setLocationNotAvailable(false);
+
         if (!prodRes || !prodRes.ok) {
-          setConnectionError(true);
+          // If it's a 404 or 500, it's NOT a connection error (the server responded)
+          if (prodRes && prodRes.status >= 400) {
+            console.error(`[DEBUG] Backend responded with status ${prodRes.status}`);
+            setConnectionError(false); 
+          } else {
+            setConnectionError(true);
+          }
         } else {
           setConnectionError(false);
         }
@@ -279,11 +334,15 @@ function App() {
     setCartItems(prev => {
       const existing = prev.find(item => item.id === product.id);
       if (existing) {
-        return prev.map(item => item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item);
+        return prev; // Do nothing if already in cart
       }
       return [...prev, { ...product, quantity: initialQty }];
     });
-    showToast(`${product.name} added to cart!`);
+    
+    const isExisting = cartItems.some(i => i.id === product.id);
+    if (!isExisting) {
+      showToast(`${product.name} added to cart!`);
+    }
   };
 
   const updateCartQuantity = (id, delta) => {
@@ -336,10 +395,25 @@ function App() {
     }
     return { 
       price: isUserB2B ? `₹${product.b2bPrice || product.price}` : `₹${product.price}`, 
-      oldPrice: product.oldPrice,
+        oldPrice: product.oldPrice,
       isB2B: isUserB2B 
     };
   };
+
+  // Strict Location Gateway check - Persists once verified
+  const isLocationSet = localStorage.getItem('selectedCity') && localStorage.getItem('zudo_tenant_id');
+
+  if (!isLocationSet) {
+    return (
+      <LocationGateway 
+        onSelect={(city, dbName) => {
+          localStorage.setItem('selectedCity', city);
+          if (dbName) localStorage.setItem('zudo_tenant_id', dbName);
+          window.location.reload();
+        }}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#f8f9fa] dark:bg-[#0a0a0a] text-gray-900 dark:text-white font-sans overflow-x-hidden relative flex flex-col transition-colors duration-500">
@@ -397,6 +471,7 @@ function App() {
                 </div>
                 <TopCategories onNavigate={handleNavigate} onCategoryClick={handleCategoryClick} categories={categories} />
                 <Showcase />
+                <NewArrivals onAddToCart={addToCart} onUpdateQuantity={updateCartQuantity} onToggleWishlist={toggleWishlist} cartItems={cartItems} wishlistItems={wishlistItems} onNavigateToProduct={navigateToProduct} onNavigate={handleNavigate} isB2B={isB2B} getDisplayPrice={getDisplayPrice} allProducts={allProducts} />
                 <HomeProducts onAddToCart={addToCart} onUpdateQuantity={updateCartQuantity} onToggleWishlist={toggleWishlist} cartItems={cartItems} wishlistItems={wishlistItems} onNavigateToProduct={navigateToProduct} onNavigate={handleNavigate} isB2B={isB2B} getDisplayPrice={getDisplayPrice} allProducts={allProducts} />
                 <PromoBanner onNavigate={handleNavigate} />
                 <HomeNeeds onAddToCart={addToCart} onUpdateQuantity={updateCartQuantity} onToggleWishlist={toggleWishlist} cartItems={cartItems} wishlistItems={wishlistItems} onNavigateToProduct={navigateToProduct} onNavigate={handleNavigate} isB2B={isB2B} getDisplayPrice={getDisplayPrice} allProducts={allProducts} />
@@ -460,6 +535,34 @@ function App() {
 
       <Footer onNavigate={handleNavigate} />
       {isLoginOpen && <LoginModal onClose={() => setIsLoginOpen(false)} setUser={setUser} />}
+
+      {locationNotAvailable && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-6">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-md"></div>
+          <div className="bg-white dark:bg-[#121212] w-full max-w-md rounded-[2.5rem] shadow-2xl relative z-10 overflow-hidden border border-gray-100 dark:border-white/5 animate-[scaleIn_0.4s_ease-out] p-10 text-center">
+            <div className="w-24 h-24 bg-red-50 dark:bg-red-500/10 rounded-full flex items-center justify-center text-red-600 mx-auto mb-8 relative">
+              <div className="absolute inset-0 bg-red-100 dark:bg-red-900/20 rounded-full animate-ping opacity-20"></div>
+              <MapPin size={48} className="relative z-10" />
+            </div>
+            <h2 className="text-3xl font-black text-gray-900 dark:text-white mb-4 tracking-tight leading-tight">We're Not There Yet!</h2>
+            <p className="text-gray-500 dark:text-gray-400 mb-10 font-bold leading-relaxed">
+              Sorry, Zudo services are currently not available in <span className="text-red-600">"{localStorage.getItem('selectedCity')}"</span>. 
+              We're expanding rapidly to bring premium groceries to your doorstep!
+            </p>
+            <div className="space-y-4">
+              <button 
+                onClick={() => {
+                  localStorage.removeItem('selectedCity');
+                  window.location.reload();
+                }}
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-5 rounded-2xl shadow-xl shadow-emerald-600/20 transition-all transform hover:-translate-y-1 active:scale-95 text-xs uppercase tracking-widest"
+              >
+                Change Location
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {toastMessage && (
         <div className="fixed bottom-6 right-6 bg-gray-900 text-white px-6 py-4 rounded-xl shadow-2xl z-[100] flex items-center gap-3">

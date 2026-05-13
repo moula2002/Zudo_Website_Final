@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Order = require('../models/Order');
 const { protect } = require('../middleware/auth');
+const sendEmail = require('../utils/email');
 
 // @route   POST /api/orders
 // @desc    Create a new order
@@ -86,6 +87,7 @@ router.get('/admin/all', protect, async (req, res) => {
   try {
     const orders = await Order.find()
       .populate('userId', 'name email role')
+      .populate('cashPersonId')
       .sort({ createdAt: -1 });
     res.json(orders);
   } catch (error) {
@@ -129,6 +131,67 @@ router.put('/:id/status', protect, async (req, res) => {
     }
 
     await order.save();
+
+    // Send email notification for Return Request
+    if (status === 'Returned') {
+      try {
+        const adminEmail = process.env.EMAIL_USER;
+        const userEmail = req.user.email;
+        const orderId = order._id.toString().slice(-6).toUpperCase();
+
+        // 1. Send to Admin
+        await sendEmail({
+          to: adminEmail,
+          subject: `Return Request: Order #${orderId}`,
+          html: `
+            <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #eee; border-radius: 10px; overflow: hidden;">
+              <div style="background-color: #f59e0b; color: white; padding: 20px; text-align: center;">
+                <h1 style="margin: 0;">New Return Request</h1>
+              </div>
+              <div style="padding: 20px;">
+                <p><strong>Order ID:</strong> #${orderId}</p>
+                <p><strong>Customer:</strong> ${req.user.name} (${req.user.email})</p>
+                <p><strong>Reason:</strong> ${order.returnReason}</p>
+                <p><strong>Comment:</strong> ${order.returnComment || 'No comment'}</p>
+                <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
+                ${order.returnImage ? `<p><strong>Evidence:</strong> <br/><img src="${order.returnImage}" style="max-width: 100%; border-radius: 10px; margin-top: 10px;"/></p>` : ''}
+              </div>
+              <div style="background-color: #f4f4f4; padding: 10px; text-align: center; font-size: 12px; color: #777;">
+                Sent from Zudo Admin Panel
+              </div>
+            </div>
+          `
+        });
+
+        // 2. Send confirmation to User
+        await sendEmail({
+          to: userEmail,
+          subject: `Return Request Received: Order #${orderId}`,
+          html: `
+            <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #eee; border-radius: 10px; overflow: hidden;">
+              <div style="background-color: #059669; color: white; padding: 20px; text-align: center;">
+                <h1 style="margin: 0;">Hello ${req.user.name}!</h1>
+              </div>
+              <div style="padding: 20px;">
+                <p>We have received your return request for <strong>Order #${orderId}</strong>.</p>
+                <p>Our team will review the details and evidence provided and get back to you shortly regarding the next steps.</p>
+                <div style="background-color: #f9f9f9; padding: 15px; border-radius: 5px; margin: 20px 0;">
+                  <p style="margin: 0;"><strong>Reason:</strong> ${order.returnReason}</p>
+                  <p style="margin: 0; font-size: 12px; color: #666; margin-top: 5px;">Your request is being processed.</p>
+                </div>
+                <p>Best regards,<br/><strong>Team Zudo</strong></p>
+              </div>
+              <div style="background-color: #f4f4f4; padding: 10px; text-align: center; font-size: 12px; color: #777;">
+                This is an automated response. Please do not reply directly to this email.
+              </div>
+            </div>
+          `
+        });
+      } catch (emailError) {
+        console.error('Return request email notification failed:', emailError);
+      }
+    }
+
     res.json(order);
   } catch (error) {
     console.error('Order status update error:', error);

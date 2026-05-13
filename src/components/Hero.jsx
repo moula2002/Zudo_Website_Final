@@ -40,8 +40,8 @@ export default function Hero({ onNavigate }) {
             <div className="w-full h-full rounded-3xl overflow-hidden border-4 md:border-[6px] border-white/10 shadow-2xl relative bg-[#064e3b]/50 backdrop-blur-sm group">
               <div className="absolute inset-0 bg-gradient-to-t from-[#022c22] via-transparent to-transparent z-10 pointer-events-none opacity-80 group-hover:opacity-60 transition-opacity duration-500"></div>
               <img 
-                src="/hero_grains.png" 
-                alt="Premium Grains and Pulses" 
+                src="/zudo_hero.png" 
+                alt="Premium Zudo Grains" 
                 className="w-full h-full object-cover relative z-0 transform group-hover:scale-105 transition-transform duration-700 ease-out" 
               />
             </div>

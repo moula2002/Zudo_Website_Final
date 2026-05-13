@@ -98,15 +98,15 @@ export default function ProductCard({ product, onAddToCart, onUpdateQuantity, on
           {product.name}
         </h3>
         
-        {product.isB2B && (
-          <div className="flex items-center gap-1.5 mt-1.5">
-            <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Seller:</span>
-            <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100/50">
-              {product.sellerName && product.sellerName !== 'Zudo Official' ? product.sellerName : (product.sellerId?.businessName || product.sellerId?.name || 'Zudo Official')}
-            </span>
+        <div className="flex items-center gap-1.5 mt-1.5">
+          <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Seller:</span>
+          <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100/50">
+            {product.sellerName && product.sellerName !== 'Zudo Official' ? product.sellerName : (product.sellerId?.businessName || product.sellerId?.name || 'Zudo Official')}
+          </span>
+          {product.isB2B && (
             <span className="text-[8px] text-gray-400 font-medium">ID: {product.sellerId?._id || product.sellerId || 'N/A'}</span>
-          </div>
-        )}
+          )}
+        </div>
         
         <div className="mt-1 pt-3 border-t border-gray-50 flex items-center justify-between">
           <div className="flex flex-col">

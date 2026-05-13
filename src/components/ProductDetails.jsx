@@ -28,8 +28,6 @@ export default function ProductDetails({ product, onAddToCart, onToggleWishlist,
   };
 
   const isPending = product?.price === 'Verification Pending';
-  const HOSTINGER_BASE = API_BASE_URL;
-
   useEffect(() => {
     if (product?.id) {
       fetchReviews();
@@ -56,13 +54,13 @@ export default function ProductDetails({ product, onAddToCart, onToggleWishlist,
     const formData = new FormData();
     formData.append('file', file);
     try {
-      const response = await fetch(`${HOSTINGER_BASE}/api/upload`, {
+      const response = await fetch(`${IMAGE_BASE_URL}/api/upload`, {
         method: 'POST',
         body: formData
       });
       if (!response.ok) throw new Error('Upload failed');
       const data = await response.json();
-      const imageUrl = `${HOSTINGER_BASE}${data.url}`;
+      const imageUrl = `${IMAGE_BASE_URL}${data.url}`;
       setNewReview(prev => ({
         ...prev,
         media: [...prev.media, { url: imageUrl, type: 'image' }]
@@ -169,15 +167,47 @@ export default function ProductDetails({ product, onAddToCart, onToggleWishlist,
 
             <h1 className="text-3xl font-black text-gray-900 dark:text-white mb-4 tracking-tight leading-tight">{product.name}</h1>
 
+            {/* Price Tiers Display */}
+            {product.priceTiers && product.priceTiers.length > 0 && (
+              <div className="mb-6 p-4 bg-emerald-50/50 dark:bg-emerald-500/5 rounded-2xl border border-emerald-100 dark:border-emerald-500/10">
+                <div className="flex items-center gap-2 mb-3">
+                  <Package size={14} className="text-emerald-600 dark:text-emerald-400" />
+                  <span className="text-[10px] font-black text-emerald-700 dark:text-emerald-400 uppercase tracking-[0.2em]">Bulk Pricing Available</span>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  {product.priceTiers.sort((a, b) => a.minQty - b.minQty).map((tier, idx) => (
+                    <div key={idx} className="bg-white dark:bg-white/5 p-3 rounded-xl border border-emerald-100 dark:border-white/10 text-center">
+                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">{tier.minQty}+ {product.unit || 'Units'}</p>
+                      <p className="text-sm font-black text-emerald-600 dark:text-emerald-400">₹{tier.price}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="flex items-center gap-4 mb-6">
               <div className="flex flex-col">
                 <span className={`text-3xl font-black ${isPending ? 'text-amber-500' : 'text-emerald-600'} tracking-tight`}>
-                  {isPending ? 'Verification Pending' : product.price.toString().startsWith('₹') ? product.price : `₹${product.price}`}
+                  {(() => {
+                    if (isPending) return 'Verification Pending';
+                    const currentQty = cartItems.find(i => i.id === product.id)?.quantity || 1;
+                    let displayPrice = product.price;
+                    
+                    if (product.priceTiers && product.priceTiers.length > 0) {
+                      const sortedTiers = [...product.priceTiers].sort((a, b) => b.minQty - a.minQty);
+                      const activeTier = sortedTiers.find(t => currentQty >= t.minQty);
+                      if (activeTier) displayPrice = activeTier.price;
+                    }
+                    
+                    return displayPrice.toString().startsWith('₹') ? displayPrice : `₹${displayPrice}`;
+                  })()}
                 </span>
                 {product.oldPrice && !isPending && (
                   <span className="text-xs text-gray-400 font-bold flex items-center gap-2">
                     <span className="line-through">₹{product.oldPrice}</span>
-                       <span className="text-red-500 text-[9px] uppercase tracking-tighter">-{Math.round((1 - product.price/product.oldPrice) * 100)}% Off</span>
+                       <span className="text-red-500 text-[9px] uppercase tracking-tighter">
+                         -{Math.round((1 - (product.priceTiers?.[0]?.price || product.price)/product.oldPrice) * 100)}% Off
+                       </span>
                   </span>
                 )}
               </div>
@@ -188,18 +218,18 @@ export default function ProductDetails({ product, onAddToCart, onToggleWishlist,
               </div>
             </div>
 
-            {isB2B && (
-              <div className="flex flex-wrap gap-3 mb-6">
-                <div className="px-4 py-2 bg-gray-900 dark:bg-white/5 text-white rounded-xl flex items-center gap-2 shadow-lg shadow-gray-900/10">
-                  <ShieldCheck size={14} className="text-emerald-400" />
-                  <div className="flex flex-col">
-                    <span className="text-[8px] font-black uppercase tracking-widest text-gray-400 leading-none mb-1">Verified Seller</span>
-                    <span className="text-xs font-bold leading-none">
-                      {product.sellerName && product.sellerName !== 'Zudo Official' ? product.sellerName : (product.sellerId?.businessName || product.sellerId?.name || 'Zudo Official')}
-                    </span>
-                    <span className="text-[9px] text-gray-500 mt-1">ID: {product.sellerId?._id || product.sellerId || 'N/A'}</span>
-                  </div>
+            <div className="flex flex-wrap gap-3 mb-6">
+              <div className="px-4 py-2 bg-gray-900 dark:bg-white/5 text-white rounded-xl flex items-center gap-2 shadow-lg shadow-gray-900/10">
+                <ShieldCheck size={14} className="text-emerald-400" />
+                <div className="flex flex-col">
+                  <span className="text-[8px] font-black uppercase tracking-widest text-gray-400 leading-none mb-1">Verified Seller</span>
+                  <span className="text-xs font-bold leading-none">
+                    {product.sellerName && product.sellerName !== 'Zudo Official' ? product.sellerName : (product.sellerId?.businessName || product.sellerId?.name || 'Zudo Official')}
+                  </span>
+                  <span className="text-[9px] text-gray-500 mt-1">ID: {product.sellerId?._id || product.sellerId || 'N/A'}</span>
                 </div>
+              </div>
+              {isB2B && (
                 <div className="px-4 py-2 bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 rounded-xl border border-amber-100 dark:border-amber-500/20 flex items-center gap-2">
                   <Package size={14} />
                   <div className="flex flex-col">
@@ -207,8 +237,8 @@ export default function ProductDetails({ product, onAddToCart, onToggleWishlist,
                     <span className="text-xs font-bold leading-none">{product.moq || 1} {product.unit || 'Units'}</span>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
 
             <div className="p-5 bg-gray-50 dark:bg-white/5 rounded-2xl border border-gray-100 dark:border-white/10 mb-8">
               <p className="text-gray-500 dark:text-gray-400 font-medium text-sm leading-relaxed">{product.description || 'Our premium collection is sourced directly from certified organic farms, ensuring peak freshness and nutrient density for your family.'}</p>
@@ -221,10 +251,32 @@ export default function ProductDetails({ product, onAddToCart, onToggleWishlist,
                 <div className="flex items-center bg-white dark:bg-white/5 rounded-xl p-1 border border-gray-200 dark:border-white/10 transition-colors">
                   <button onClick={() => onUpdateQuantity(product.id, -1)} className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-gray-50 dark:hover:bg-white/10 text-gray-900 dark:text-white transition-all"><Minus size={16} /></button>
                   <span className="w-10 text-center font-black text-base dark:text-white">{cartItems.find(i => i.id === product.id)?.quantity || 1}</span>
-                  <button onClick={() => onAddToCart(product)} className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-gray-50 dark:hover:bg-white/10 text-gray-900 dark:text-white transition-all"><Plus size={16} /></button>
+                  <button 
+                    onClick={() => {
+                      const item = cartItems.find(i => i.id === product.id);
+                      if (item) {
+                        onUpdateQuantity(product.id, 1);
+                      } else {
+                        onAddToCart(product);
+                      }
+                    }} 
+                    className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-gray-50 dark:hover:bg-white/10 text-gray-900 dark:text-white transition-all"
+                  >
+                    <Plus size={16} />
+                  </button>
                 </div>
-                <button onClick={() => onAddToCart(product)} className="flex-grow h-12 bg-emerald-600 text-white rounded-xl font-black uppercase tracking-widest text-xs hover:bg-emerald-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 active:scale-[0.98]">
-                  <ShoppingCart size={18} /> Add to Cart
+                <button 
+                  onClick={() => {
+                    const isAlreadyInCart = cartItems.some(i => i.id === product.id);
+                    if (isAlreadyInCart) {
+                      onNavigate('cart');
+                    } else {
+                      onAddToCart(product);
+                    }
+                  }} 
+                  className="flex-grow h-12 bg-emerald-600 text-white rounded-xl font-black uppercase tracking-widest text-xs hover:bg-emerald-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 active:scale-[0.98]"
+                >
+                  <ShoppingCart size={18} /> {cartItems.some(i => i.id === product.id) ? 'View in Cart' : 'Add to Cart'}
                 </button>
               </div>
               <div className="flex gap-3">

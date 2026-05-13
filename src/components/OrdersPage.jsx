@@ -10,7 +10,6 @@ export default function OrdersPage({ onNavigate }) {
 
 
     const apiBase = API_BASE_URL;
-    const uploadBase = API_BASE_URL;
 
   const [returnModal, setReturnModal] = useState({ open: false, order: null });
   const [returnForm, setReturnForm] = useState({ selectedReason: '', comment: '', image: null, preview: null });
@@ -28,9 +27,15 @@ export default function OrdersPage({ onNavigate }) {
   useEffect(() => {
     const fetchOrders = async () => {
       try {
+        const selectedCity = localStorage.getItem('selectedCity');
+        const savedTenantId = localStorage.getItem('zudo_tenant_id');
+        const locationHeader = savedTenantId || selectedCity || '';
+
         const response = await fetch(`${apiBase}/api/orders/myorders`, {
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'x-location': locationHeader,
+            'x-tenant-id': locationHeader
           }
         });
         const data = await response.json();
@@ -55,11 +60,17 @@ export default function OrdersPage({ onNavigate }) {
         body.returnImage = returnData.image;
       }
 
+      const selectedCity = localStorage.getItem('selectedCity');
+      const savedTenantId = localStorage.getItem('zudo_tenant_id');
+      const locationHeader = savedTenantId || selectedCity || '';
+
       const response = await fetch(`${API_URL}/orders/${orderId}/status`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'x-location': locationHeader,
+          'x-tenant-id': locationHeader
         },
         body: JSON.stringify(body)
       });
@@ -91,7 +102,7 @@ export default function OrdersPage({ onNavigate }) {
       if (returnForm.image) {
         const formData = new FormData();
         formData.append('file', returnForm.image);
-        const uploadRes = await fetch(`${API_BASE_URL}/api/upload`, {
+        const uploadRes = await fetch(`${IMAGE_BASE_URL}/api/upload`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -245,18 +256,15 @@ export default function OrdersPage({ onNavigate }) {
                 <div className="p-6 md:p-8">
                   <div className="flex flex-col md:flex-row gap-6 justify-between">
                     <div className="flex gap-6">
-                      <div className="w-20 h-20 bg-emerald-50 rounded-3xl flex-shrink-0 flex flex-col items-center justify-center border border-emerald-100 group-hover:bg-emerald-100 transition-colors duration-500 p-2 text-center">
-                        {order.cashPersonId && typeof order.cashPersonId === 'object' ? (
-                          <>
-                            <div className="text-emerald-700 font-black text-xl leading-none mb-1">
-                              {order.cashPersonId.name?.charAt(0) || 'C'}
-                            </div>
-                            <div className="text-[8px] font-black text-emerald-600 uppercase tracking-tighter truncate w-full">
-                              {order.cashPersonId.name?.split(' ')[0]}
-                            </div>
-                          </>
+                      <div className="w-20 h-20 bg-emerald-50 rounded-3xl flex-shrink-0 flex items-center justify-center border border-emerald-100 group-hover:scale-105 transition-transform duration-500 overflow-hidden">
+                        {order.items && order.items.length > 0 ? (
+                          <img 
+                            src={formatImageUrl(order.items[0].image || order.items[0].product?.image)} 
+                            alt={order.items[0].name} 
+                            className="w-full h-full object-cover"
+                          />
                         ) : (
-                          <div className="text-emerald-700 font-black text-xl">Z</div>
+                          <Package className="text-emerald-600" size={32} />
                         )}
                       </div>
                       <div className="space-y-2">
@@ -264,9 +272,20 @@ export default function OrdersPage({ onNavigate }) {
                           <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] bg-gray-50 px-3 py-1 rounded-full border border-gray-100">
                             ID: #{order._id.slice(-6).toUpperCase()}
                           </span>
+                          <span className="text-[10px] font-black text-emerald-600 uppercase tracking-[0.2em] bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">
+                            Seller: {order.items[0]?.sellerName || order.items[0]?.product?.sellerName || order.items[0]?.product?.sellerId?.businessName || order.items[0]?.product?.sellerId?.name || 'Zudo Official'}
+                          </span>
                           <div className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-[10px] font-black tracking-widest uppercase transition-all ${getStatusStyle(order.orderStatus)}`}>
                             {getStatusIcon(order.orderStatus)}
                             {order.orderStatus}
+                          </div>
+                          <div className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-[10px] font-black tracking-widest uppercase transition-all ${
+                            order.paymentStatus === 'Paid' ? 'bg-emerald-500 text-white' : 
+                            order.paymentStatus === 'Failed' ? 'bg-red-500 text-white' :
+                            'bg-amber-500 text-white'
+                          }`}>
+                            <Receipt size={12} />
+                            {order.paymentStatus || 'Pending'}
                           </div>
                           {order.deliveryOtp && order.orderStatus !== 'Delivered' && order.orderStatus !== 'Cancelled' && (
                             <div className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-1.5 rounded-full text-[10px] font-black tracking-widest uppercase shadow-lg shadow-emerald-600/20">
@@ -292,7 +311,11 @@ export default function OrdersPage({ onNavigate }) {
                       <div className="flex -space-x-4">
                         {order.items.slice(0, 3).map((item, idx) => (
                           <div key={idx} className="w-12 h-12 rounded-2xl border-4 border-white bg-white overflow-hidden shadow-md transform hover:-translate-y-2 hover:z-10 transition-all cursor-pointer">
-                            <img src={formatImageUrl(item.product?.imageUrl || item.product?.image || item.image || item.imageUrl)} alt="Item" className="w-full h-full object-cover" />
+                            <img 
+                              src={formatImageUrl(item.product?.imageUrl || item.product?.image || item.image || item.imageUrl)} 
+                              alt="Item" 
+                              className="w-full h-full object-cover" 
+                            />
                           </div>
                         ))}
                         {order.items.length > 3 && (
@@ -348,6 +371,16 @@ export default function OrdersPage({ onNavigate }) {
                             <div className="flex justify-between items-center text-sm">
                               <span className="text-gray-500 font-bold">Payment Method</span>
                               <span className="font-black text-gray-900">{order.paymentMethod}</span>
+                            </div>
+                            <div className="flex justify-between items-center text-sm">
+                              <span className="text-gray-500 font-bold">Payment Status</span>
+                              <span className={`px-3 py-1 rounded-full text-[10px] font-black ${
+                                order.paymentStatus === 'Paid' ? 'bg-emerald-100 text-emerald-700' : 
+                                order.paymentStatus === 'Failed' ? 'bg-red-100 text-red-700' :
+                                'bg-amber-100 text-amber-700'
+                              }`}>
+                                {order.paymentStatus || 'Pending'}
+                              </span>
                             </div>
                             <div className="flex justify-between items-center text-sm">
                               <span className="text-gray-500 font-bold">Order Status</span>
@@ -433,8 +466,11 @@ export default function OrdersPage({ onNavigate }) {
                                   <img src={formatImageUrl(item.product?.imageUrl || item.product?.image || item.image || item.imageUrl)} alt={item.product?.name || item.name} className="w-full h-full object-cover" />
                                 </div>
                                 <div>
-                                  <p className="font-black text-gray-900 text-sm leading-none mb-1">{item.product?.name || 'Unknown Product'}</p>
+                                  <p className="font-black text-gray-900 text-sm leading-none mb-1">{item.product?.name || item.name || 'Unknown Product'}</p>
                                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{item.quantity} × ₹{item.price}</p>
+                                  <p className="text-[10px] font-bold text-emerald-600 mt-1 uppercase tracking-tight">
+                                    Sold by: {item.sellerName || item.product?.sellerName || item.product?.sellerId?.businessName || item.product?.sellerId?.name || 'Zudo Official'}
+                                  </p>
                                 </div>
                               </div>
                               <div className="text-sm font-black text-gray-900">₹{item.quantity * item.price}</div>

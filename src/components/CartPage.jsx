@@ -5,10 +5,19 @@ export default function CartPage({ cartItems, onUpdateQuantity, onRemove, onNavi
   const user = JSON.parse(localStorage.getItem('user') || 'null');
   const isB2BPending = user?.role === 'b2b' && !user.isVerified;
 
-  const subtotal = cartItems.reduce((acc, item) => {
+  // Helper to get tiered price
+  const getItemPrice = (item) => {
+    if (item.priceTiers && item.priceTiers.length > 0) {
+      const sortedTiers = [...item.priceTiers].sort((a, b) => b.minQty - a.minQty);
+      const activeTier = sortedTiers.find(t => item.quantity >= t.minQty);
+      if (activeTier) return activeTier.price;
+    }
     const priceStr = String(item.price);
-    const price = parseInt(priceStr.replace(/\D/g, '')) || 0;
-    return acc + (price * item.quantity);
+    return parseInt(priceStr.replace(/\D/g, '')) || 0;
+  };
+
+  const subtotal = cartItems.reduce((acc, item) => {
+    return acc + (getItemPrice(item) * item.quantity);
   }, 0);
 
   const deliveryFee = subtotal > 500 ? 0 : 50;
@@ -91,17 +100,20 @@ export default function CartPage({ cartItems, onUpdateQuantity, onRemove, onNavi
                     
                     <div className="flex-grow">
                       <h3 className="text-lg font-black text-gray-900 mb-0.5 leading-tight">{item.name}</h3>
-                      {isB2B && (
-                        <div className="flex items-center gap-1.5 mb-2">
-                          <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Seller:</span>
-                          <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100/50">
-                            {item.sellerName && item.sellerName !== 'Zudo Official' 
-                              ? item.sellerName 
-                              : (item.sellerId?.businessName || item.sellerId?.name || item.sellerName || 'Zudo Official')}
-                          </span>
-                        </div>
-                      )}
-                      <div className="text-emerald-600 font-black text-xl tracking-tighter">{item.price}</div>
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Seller:</span>
+                        <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100/50">
+                          {item.sellerName && item.sellerName !== 'Zudo Official' 
+                            ? item.sellerName 
+                            : (item.sellerId?.businessName || item.sellerId?.name || item.sellerName || 'Zudo Official')}
+                        </span>
+                      </div>
+                      <div className="flex flex-col items-end">
+                        <div className="text-emerald-600 font-black text-xl tracking-tighter">₹{getItemPrice(item)}</div>
+                        {item.priceTiers?.some(t => item.quantity >= t.minQty) && (
+                          <span className="text-[8px] font-black text-emerald-500 uppercase tracking-widest bg-emerald-50 px-1.5 py-0.5 rounded-md mt-1 border border-emerald-100">Bulk Applied</span>
+                        )}
+                      </div>
                     </div>
 
                     <div className="flex items-center justify-between sm:justify-end gap-6">

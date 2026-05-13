@@ -39,35 +39,46 @@ const upload = multer({
 
 router.get('/', async (req, res) => {
   try {
+    console.log('[DEBUG] Route GET /api/products called');
     const products = await Product.find().populate('categoryId').populate('subCategoryId');
+    console.log(`[DEBUG] Found ${products.length} products`);
     
     // Manually fetch seller names to be 100% sure
     const productsWithSellers = await Promise.all(products.map(async (product) => {
-      const p = product.toObject();
-      if (p.sellerId) {
-        // Try Mongoose first
-        let seller = await Seller.findById(p.sellerId);
-        
-        // Fallback to direct DB query if Mongoose fails
-        if (!seller) {
-          const db = mongoose.connection.db;
-          seller = await db.collection('sellers').findOne({ 
-            _id: p.sellerId instanceof mongoose.Types.ObjectId ? p.sellerId : new mongoose.Types.ObjectId(p.sellerId) 
-          });
-        }
+      try {
+        const p = product.toObject();
+        if (p.sellerId) {
+          // Try Mongoose first
+          let seller = await Seller.findById(p.sellerId);
+          
+          // Fallback to direct DB query if Mongoose fails
+          if (!seller) {
+            const db = Product.db;
+            if (db) {
+              seller = await db.collection('sellers').findOne({ 
+                _id: p.sellerId instanceof mongoose.Types.ObjectId ? p.sellerId : new mongoose.Types.ObjectId(p.sellerId) 
+              });
+            }
+          }
 
-        if (seller) {
-          p.sellerName = seller.businessName || seller.name;
-          p.sellerId = seller; 
-        } else {
-          p.sellerName = "Zudo Official";
+          if (seller) {
+            p.sellerName = seller.businessName || seller.name;
+            p.sellerId = seller; 
+          } else {
+            p.sellerName = "Zudo Official";
+          }
         }
+        return p;
+      } catch (err) {
+        console.error(`[DEBUG] Error processing product ${product._id}:`, err);
+        return product.toObject();
       }
-      return p;
     }));
 
+    console.log('[DEBUG] Product mapping complete');
     res.json(productsWithSellers);
   } catch (error) {
+    console.error('[DEBUG] Route GET /api/products FAILED:', error);
     res.status(500).json({ message: error.message });
   }
 });

@@ -47,10 +47,18 @@ export default function LoginModal({ onClose, setUser, initialB2B = null }) {
       const result = await signInWithPopup(auth, googleProvider);
       const fbUser = result.user;
 
+      const selectedCity = localStorage.getItem('selectedCity');
+      const savedTenantId = localStorage.getItem('zudo_tenant_id');
+      const locationHeader = savedTenantId || selectedCity || '';
+
       try {
         const response = await fetch(`${API_URL}/auth/google-login`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'x-location': locationHeader,
+            'x-tenant-id': locationHeader
+          },
           body: JSON.stringify({
             name: fbUser.displayName,
             email: fbUser.email,
@@ -83,7 +91,11 @@ export default function LoginModal({ onClose, setUser, initialB2B = null }) {
           const fallbackPassword = `fb_${fbUser.uid}_google`;
           const regResponse = await fetch(`${API_URL}/auth/register`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+              'Content-Type': 'application/json',
+              'x-location': locationHeader,
+              'x-tenant-id': locationHeader
+            },
             body: JSON.stringify({
               name: fbUser.displayName,
               email: fbUser.email,
@@ -177,9 +189,17 @@ export default function LoginModal({ onClose, setUser, initialB2B = null }) {
             gstPdf: ''
           };
 
+      const selectedCity = localStorage.getItem('selectedCity');
+      const savedTenantId = localStorage.getItem('zudo_tenant_id');
+      const locationHeader = savedTenantId || selectedCity || '';
+
       const response = await fetch(`${API_URL}${endpoint}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-location': locationHeader,
+          'x-tenant-id': locationHeader
+        },
         body: JSON.stringify(payload)
       });
 
@@ -212,9 +232,17 @@ export default function LoginModal({ onClose, setUser, initialB2B = null }) {
     setForgotSuccess('');
 
     try {
+      const selectedCity = localStorage.getItem('selectedCity');
+      const savedTenantId = localStorage.getItem('zudo_tenant_id');
+      const locationHeader = savedTenantId || selectedCity || '';
+
       const response = await fetch(`${API_URL}/auth/forgot-password`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-location': locationHeader,
+          'x-tenant-id': locationHeader
+        },
         body: JSON.stringify({ email: forgotEmail, role: isB2B ? 'b2b' : 'b2c' })
       });
 
@@ -242,13 +270,13 @@ export default function LoginModal({ onClose, setUser, initialB2B = null }) {
 
         {!selection ? (
           <div className="w-full flex flex-col md:flex-row min-h-[400px]">
-             <div className="flex-1 group relative overflow-hidden flex flex-col items-center justify-center p-8 transition-all duration-700 hover:bg-emerald-50/50 dark:hover:bg-emerald-500/10 border-r border-gray-100 dark:border-white/5 bg-[#0f172a] dark:bg-black">
+             <div className="flex-1 group relative overflow-hidden flex flex-col items-center justify-center p-8 transition-all duration-700 hover:bg-emerald-50/50 dark:hover:bg-emerald-500/10 border-r border-gray-100 dark:border-white/5 bg-gray-50 dark:bg-black">
                 <div className="relative z-10 flex flex-col items-center text-center">
                   <div className="w-20 h-20 bg-emerald-600 rounded-2xl flex items-center justify-center text-white mb-6 shadow-xl shadow-emerald-600/20 group-hover:scale-110 transition-all duration-500">
                     <UserCircle size={40} />
                   </div>
-                  <h3 className="text-2xl font-black text-white mb-2 tracking-tight">Personal</h3>
-                  <p className="text-gray-400 font-bold text-xs max-w-[200px]">Shop our fresh grocery collection.</p>
+                  <h3 className="text-2xl font-black text-gray-900 dark:text-white mb-2 tracking-tight">Personal</h3>
+                  <p className="text-gray-600 dark:text-gray-400 font-bold text-xs max-w-[200px]">Shop our fresh grocery collection.</p>
                   <button onClick={() => { setSelection('b2c'); setIsB2B(false); }} className="mt-6 px-6 py-3 bg-transparent border-2 border-emerald-600 text-emerald-400 font-black text-xs rounded-xl hover:bg-emerald-600 hover:text-white transition-all duration-300 shadow-lg shadow-emerald-600/5">Continue as Customer</button>
                 </div>
              </div>

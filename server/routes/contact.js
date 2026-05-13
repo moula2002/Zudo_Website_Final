@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const nodemailer = require('nodemailer');
+const sendEmail = require('../utils/email');
 
 // @route   POST /api/contact
 // @desc    Send contact form message via email
@@ -15,23 +15,11 @@ router.post('/', async (req, res) => {
   console.log('Contact form submission received:', { name, email, subject, phone });
 
   try {
-    // Check if email config exists
-    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-      return res.status(500).json({ message: 'Email configuration missing on server' });
-    }
-
-    const transporter = nodemailer.createTransport({
-      service: process.env.EMAIL_SERVICE || 'gmail',
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-      }
-    });
+    const adminEmail = process.env.EMAIL_USER;
 
     // 1. Send email to Admin
-    const adminMailOptions = {
-      to: process.env.EMAIL_USER, // Sending to the support email itself
-      from: `Zudo Contact Form <${process.env.EMAIL_USER}>`,
+    await sendEmail({
+      to: adminEmail,
       subject: `New Contact Form Submission: ${customerSubject}`,
       html: `
         <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #eee; border-radius: 10px; overflow: hidden;">
@@ -52,12 +40,11 @@ router.post('/', async (req, res) => {
           </div>
         </div>
       `
-    };
+    });
 
     // 2. Send confirmation email to User
-    const userMailOptions = {
+    await sendEmail({
       to: email,
-      from: `Zudo Support <${process.env.EMAIL_USER}>`,
       subject: 'We received your message!',
       html: `
         <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #eee; border-radius: 10px; overflow: hidden;">
@@ -76,13 +63,7 @@ router.post('/', async (req, res) => {
           </div>
         </div>
       `
-    };
-
-    // Send both emails
-    await Promise.all([
-      transporter.sendMail(adminMailOptions),
-      transporter.sendMail(userMailOptions)
-    ]);
+    });
 
     res.json({ message: 'Message sent successfully' });
   } catch (error) {

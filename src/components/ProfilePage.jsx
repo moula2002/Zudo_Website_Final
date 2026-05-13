@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { User, Mail, Phone, MapPin, Camera, Save, ArrowLeft, Package, X } from 'lucide-react';
+import { User, Mail, Phone, MapPin, Camera, Save, ArrowLeft, Package, X, AlertTriangle } from 'lucide-react';
 import { useLocation } from '../hooks/useLocation';
-import { API_URL, API_BASE_URL } from '../config';
+import { API_URL, IMAGE_BASE_URL } from '../config';
 
 export default function ProfilePage({ user, onUpdateUser, onNavigate, initialTab = 'addresses' }) {
   const [formData, setFormData] = useState({
@@ -24,9 +24,15 @@ export default function ProfilePage({ user, onUpdateUser, onNavigate, initialTab
     // Fetch latest profile data from backend
     const fetchProfile = async () => {
       try {
+        const selectedCity = localStorage.getItem('selectedCity');
+        const savedTenantId = localStorage.getItem('zudo_tenant_id');
+        const locationHeader = savedTenantId || selectedCity || '';
+
         const response = await fetch(`${API_URL}/auth/profile`, {
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'x-location': locationHeader,
+            'x-tenant-id': locationHeader
           }
         });
         const data = await response.json();
@@ -57,13 +63,17 @@ export default function ProfilePage({ user, onUpdateUser, onNavigate, initialTab
     const formDataUpload = new FormData();
     formDataUpload.append('file', file);
 
-    const uploadBase = API_BASE_URL;
-
     try {
-      const response = await fetch(`${uploadBase}/api/upload`, {
+      const selectedCity = localStorage.getItem('selectedCity');
+      const savedTenantId = localStorage.getItem('zudo_tenant_id');
+      const locationHeader = savedTenantId || selectedCity || '';
+
+      const response = await fetch(`${IMAGE_BASE_URL}/api/upload`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'x-location': locationHeader,
+          'x-tenant-id': locationHeader
         },
         body: formDataUpload
       });
@@ -71,7 +81,7 @@ export default function ProfilePage({ user, onUpdateUser, onNavigate, initialTab
       const data = await response.json();
       if (!response.ok) throw new Error(data.message || 'Upload failed');
 
-      const fullImageUrl = `${uploadBase}${data.url}`;
+      const fullImageUrl = `${IMAGE_BASE_URL}${data.url}`;
       setFormData(prev => ({ ...prev, profileImage: fullImageUrl }));
       setMessage({ type: 'success', text: 'Image uploaded to cloud! Remember to save changes.' });
     } catch (err) {
@@ -87,11 +97,17 @@ export default function ProfilePage({ user, onUpdateUser, onNavigate, initialTab
     setMessage({ type: '', text: '' });
 
     try {
+      const selectedCity = localStorage.getItem('selectedCity');
+      const savedTenantId = localStorage.getItem('zudo_tenant_id');
+      const locationHeader = savedTenantId || selectedCity || '';
+
       const response = await fetch(`${API_URL}/auth/profile`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'x-location': locationHeader,
+          'x-tenant-id': locationHeader
         },
         body: JSON.stringify({
           ...formData,
@@ -133,6 +149,39 @@ export default function ProfilePage({ user, onUpdateUser, onNavigate, initialTab
     lng: currentLng || 0,
     isDefault: false
   });
+  const [pincodeError, setPincodeError] = useState('');
+
+  const checkPincode = async (code) => {
+    if (code.length === 6) {
+      try {
+        const selectedCity = localStorage.getItem('selectedCity');
+        const savedTenantId = localStorage.getItem('zudo_tenant_id');
+        const locationHeader = savedTenantId || selectedCity || '';
+
+        const res = await fetch(`${API_URL}/tenancy/find/${code}`, {
+          headers: {
+            'x-location': locationHeader,
+            'x-tenant-id': locationHeader
+          }
+        });
+        const data = await res.json();
+        
+        if (!res.ok) {
+          setPincodeError('Delivery not available for this location');
+        } else {
+          if (data.dbName !== savedTenantId) {
+            setPincodeError(`This pincode belongs to ${data.city}. Select ${data.city} to shop there.`);
+          } else {
+            setPincodeError('');
+          }
+        }
+      } catch (err) {
+        console.error('Pincode check failed');
+      }
+    } else {
+      setPincodeError('');
+    }
+  };
 
   useEffect(() => {
     if (currentLat && currentLng) {
@@ -143,6 +192,7 @@ export default function ProfilePage({ user, onUpdateUser, onNavigate, initialTab
         city: currentCity || prev.city,
         pincode: currentPincode || prev.pincode
       }));
+      if (currentPincode) checkPincode(currentPincode);
     }
   }, [currentLat, currentLng, currentCity, currentPincode]);
 
@@ -158,11 +208,17 @@ export default function ProfilePage({ user, onUpdateUser, onNavigate, initialTab
         return rest;
       });
 
+      const selectedCity = localStorage.getItem('selectedCity');
+      const savedTenantId = localStorage.getItem('zudo_tenant_id');
+      const locationHeader = savedTenantId || selectedCity || '';
+
       const response = await fetch(`${API_URL}/auth/profile`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'x-location': locationHeader,
+          'x-tenant-id': locationHeader
         },
         body: JSON.stringify({ savedAddresses: cleanedAddresses })
       });
@@ -444,13 +500,34 @@ export default function ProfilePage({ user, onUpdateUser, onNavigate, initialTab
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Pincode</label>
-                    <input 
-                      type="text"
-                      value={addressForm.pincode}
-                      onChange={(e) => setAddressForm({ ...addressForm, pincode: e.target.value })}
-                      placeholder="6-digit code"
-                      className="w-full px-5 py-3 rounded-2xl border border-gray-100 bg-white focus:border-emerald-500 outline-none transition-all font-bold text-gray-800 text-sm"
-                    />
+                    <div className="relative group">
+                      <input 
+                        type="text"
+                        value={addressForm.pincode}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/\D/g, '');
+                          setAddressForm({ ...addressForm, pincode: val });
+                          checkPincode(val);
+                        }}
+                        placeholder="6-digit code"
+                        className={`w-full px-5 py-3.5 rounded-2xl border-2 transition-all font-black text-sm outline-none ${
+                          pincodeError 
+                            ? 'border-red-100 bg-red-50 text-red-900 placeholder:text-red-300 focus:border-red-500 focus:ring-4 focus:ring-red-500/10' 
+                            : 'border-gray-100 bg-white text-gray-900 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10'
+                        }`}
+                      />
+                      {pincodeError && (
+                        <div className="absolute right-4 top-1/2 -translate-y-1/2 text-red-500 animate-bounce">
+                          <AlertTriangle size={16} />
+                        </div>
+                      )}
+                    </div>
+                    {pincodeError && (
+                      <div className="mt-2 px-4 py-2 bg-red-50 border border-red-100 rounded-xl flex items-center gap-2 animate-[shake_0.4s_ease-in-out]">
+                        <div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
+                        <p className="text-[10px] font-black text-red-600 uppercase tracking-wider leading-none">{pincodeError}</p>
+                      </div>
+                    )}
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">State</label>
@@ -489,7 +566,8 @@ export default function ProfilePage({ user, onUpdateUser, onNavigate, initialTab
                   </button>
                   <button 
                     onClick={handleAddAddress}
-                    className="flex-[2] py-4 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-600/20"
+                    disabled={!!pincodeError}
+                    className="flex-[2] py-4 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-600/20 disabled:opacity-50 disabled:grayscale"
                   >
                     Save Address
                   </button>
