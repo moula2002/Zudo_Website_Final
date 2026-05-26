@@ -23,7 +23,8 @@ const formatUser = (user) => ({
   panNumber: user.panNumber,
   aadhaarNumber: user.aadhaarNumber,
   savedAddresses: user.savedAddresses,
-  businessName: user.businessName
+  businessName: user.businessName,
+  pincode: user.pincode
 });
 
 // @route   POST /api/auth/login
@@ -48,29 +49,31 @@ router.post('/register', async (req, res) => {
   try {
     const { name, email, password, role, phone, businessName, gstPdf } = req.body;
     const targetRole = role || 'b2c';
-    
+
     // Check if account with THIS EXACT role already exists
     const userExists = await User.findOne({ email, role: targetRole });
     if (userExists) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         message: `An account with the ${targetRole.toUpperCase()} role already exists for this email.`,
         error: 'ALREADY_EXISTS'
       });
     }
 
-    // Create user with ALL provided fields (including B2B docs if present)
+    // Create user with a new session ID
+    const sessionId = crypto.randomBytes(16).toString('hex');
     const user = await User.create({
-      name, 
-      email, 
-      password, 
-      role: targetRole, 
+      name,
+      email,
+      password,
+      role: targetRole,
       phone,
       businessName: businessName || '',
       gstPdf: gstPdf || '',
-      isWaitingApproval: false
+      isWaitingApproval: false,
+      sessionId
     });
 
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '30d' });
+    const token = jwt.sign({ id: user._id, sessionId }, process.env.JWT_SECRET, { expiresIn: '30d' });
     res.status(201).json({ token, user: formatUser(user) });
   } catch (error) {
     console.error('Registration Error:', error);
@@ -89,15 +92,19 @@ router.post('/user-login', async (req, res) => {
   try {
     const targetRole = role || 'b2c';
     const user = await User.findOne({ email, role: targetRole });
-    
+
     if (user && (await user.comparePassword(password))) {
-      const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '30d' });
+      const sessionId = crypto.randomBytes(16).toString('hex');
+      user.sessionId = sessionId;
+      await user.save();
+
+      const token = jwt.sign({ id: user._id, sessionId }, process.env.JWT_SECRET, { expiresIn: '30d' });
       res.json({ token, user: formatUser(user) });
     } else {
       // Check if user exists with DIFFERENT role to provide better error
       const otherRoleUser = await User.findOne({ email });
       if (otherRoleUser) {
-        return res.status(401).json({ 
+        return res.status(401).json({
           message: `This account is currently registered as ${otherRoleUser.role.toUpperCase()}. Please switch to the correct portal or register a new ${targetRole.toUpperCase()} profile.`,
           hasOtherRole: true
         });
@@ -128,6 +135,7 @@ router.put('/profile', protect, async (req, res) => {
       user.name = req.body.name || user.name;
       user.phone = req.body.phone || user.phone;
       user.profilePicture = req.body.profilePicture || user.profilePicture;
+      user.storePic = req.body.storePic || user.storePic;
       if (req.body.savedAddresses) user.savedAddresses = req.body.savedAddresses;
       if (req.body.password) user.password = req.body.password;
 
@@ -152,6 +160,7 @@ router.post('/b2b-verify-submit', protect, async (req, res) => {
     user.gstNumber = req.body.gstNumber;
     user.panNumber = req.body.panNumber;
     user.aadhaarNumber = req.body.aadhaarNumber;
+    user.pincode = req.body.pincode;
     user.isWaitingApproval = true;
 
     const savedUser = await user.save();
@@ -167,15 +176,20 @@ router.post('/google-login', async (req, res) => {
   const targetRole = role || 'b2c';
   try {
     let user = await User.findOne({ email, role: targetRole });
-    
+
+    const sessionId = crypto.randomBytes(16).toString('hex');
     if (!user) {
       user = await User.create({
         name, email, profilePicture, role: targetRole,
         password: Math.random().toString(36).slice(-10),
-        isWaitingApproval: false
+        isWaitingApproval: false,
+        sessionId
       });
+    } else {
+      user.sessionId = sessionId;
+      await user.save();
     }
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '30d' });
+    const token = jwt.sign({ id: user._id, sessionId }, process.env.JWT_SECRET, { expiresIn: '30d' });
     res.json({ token, user: formatUser(user) });
   } catch (error) {
     res.status(400).json({ message: error.message });
@@ -200,7 +214,7 @@ router.post('/forgot-password', async (req, res) => {
 
     // Send email (Mock for now, but configured with nodemailer)
     const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password/${resetToken}`;
-    
+
     // Check if email config exists
     if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
       const transporter = nodemailer.createTransport({
@@ -225,7 +239,7 @@ router.post('/forgot-password', async (req, res) => {
       res.json({ message: 'Email sent' });
     } else {
       // If no email config, return token for testing (SECURITY RISK IN PRODUCTION)
-      res.json({ 
+      res.json({
         message: 'Email configuration missing. Token returned for testing.',
         resetToken: resetToken,
         resetUrl: resetUrl

@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { MapPin, X, Package, Search, ChevronRight, ArrowRight, Navigation } from 'lucide-react';
+import { MapPin, X, Package, Search, ChevronRight, ArrowRight, Navigation as NavIcon } from 'lucide-react';
 import { useLocation } from '../hooks/useLocation';
+import { API_URL } from '../config';
 
-const API_BASE = window.location.hostname === 'localhost' ? 'http://localhost:5000/api' : '/api';
+const API_BASE = API_URL;
 
 export default function LocationGateway({ onSelect }) {
   const [step, setStep] = useState('pincode'); // 'pincode', 'address', 'city', or 'request'
@@ -38,6 +39,7 @@ export default function LocationGateway({ onSelect }) {
           const res = await fetch(`${API_BASE}/tenancy/find/${detPincode}`);
           const data = await res.json();
           if (res.ok) {
+            localStorage.setItem('enteredPincode', detPincode);
             onSelect(data.city, data.dbName);
           } else {
             setPincode(detPincode);
@@ -66,6 +68,7 @@ export default function LocationGateway({ onSelect }) {
       const res = await fetch(`${API_BASE}/tenancy/find/${pincode}`);
       const data = await res.json();
       if (res.ok) {
+        localStorage.setItem('enteredPincode', pincode);
         onSelect(data.city, data.dbName);
       } else {
         setStep('request');
@@ -214,7 +217,7 @@ export default function LocationGateway({ onSelect }) {
                   >
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 bg-white dark:bg-[#1a1a1a] rounded-xl flex items-center justify-center text-emerald-600 shadow-sm group-hover:bg-emerald-600 group-hover:text-white transition-all">
-                        <Navigation size={18} className={locationLoading ? 'animate-spin' : ''} />
+                        <NavIcon size={18} className={locationLoading ? 'animate-spin' : ''} />
                       </div>
                       <div className="text-left">
                         <p className="text-xs font-black text-gray-900 dark:text-white">Detect My Location</p>

@@ -89,7 +89,13 @@ router.get('/find/:pincode', async (req, res) => {
     
     if (mapping) {
       const location = await centralDb.collection('locations').findOne({ city: mapping.city });
-      return res.json(location || { 
+      if (location) {
+        return res.json({
+          ...location,
+          dbName: location.dbName || location.name || mapping.dbName || `zudo-${mapping.city.toLowerCase()}`
+        });
+      }
+      return res.json({ 
         dbName: mapping.dbName || `zudo-${mapping.city.toLowerCase()}`, 
         city: mapping.city,
         pincode: pincode

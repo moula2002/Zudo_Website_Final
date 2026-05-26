@@ -20,6 +20,13 @@ const protect = async (req, res, next) => {
       // Check User
       account = await User.findById(decoded.id).select('-password');
       if (account) {
+        // If account has sessionId and it doesn't match the one in token, reject
+        if (account.sessionId && decoded.sessionId && account.sessionId !== decoded.sessionId) {
+          return res.status(401).json({ 
+            message: 'Your session has expired because you logged in on another device.',
+            error: 'SESSION_EXPIRED'
+          });
+        }
         req.user = account;
         return next();
       }

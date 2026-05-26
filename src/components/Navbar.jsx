@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { ShoppingCart, ChevronDown, Menu, Heart, Search, X, Wheat, Leaf, ShoppingBag, Package, Coffee, LogOut, Settings, UserCircle, Home, LayoutGrid, PhoneCall, MapPin, Clock, Sun, Moon } from 'lucide-react';
+import { ShoppingCart, ChevronDown, Menu, Heart, Search, X, Wheat, Leaf, ShoppingBag, Package, Coffee, LogOut, Settings, UserCircle, Home, LayoutGrid, PhoneCall, MapPin, Clock, Sun, Moon, Newspaper } from 'lucide-react';
 import { useLocation } from '../hooks/useLocation';
-import { IMAGE_BASE_URL } from '../config';
+import { IMAGE_BASE_URL, cleanImageUrl, API_URL } from '../config';
 
 export default function Navbar({ cartCount = 0, wishlistCount = 0, onLoginClick, onNavigate, onSearch, onCategoryClick, onNavigateToProduct, currentPage = 'home', isB2B = false, onLogout, user, categories = [], subcategories = [], allProducts = [], isDarkMode, toggleTheme }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -32,11 +32,11 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, onLoginClick,
 
     acc[cat.name] = {
       icon,
-      img: (cat.image || cat.imageUrl)?.startsWith('http') ? (cat.image || cat.imageUrl) : (cat.image || cat.imageUrl ? `${IMAGE_BASE_URL}${cat.image || cat.imageUrl}` : 'https://images.unsplash.com/photo-1542831371-29b0f74f9713?auto=format&fit=crop&q=80&w=200'),
+      img: cleanImageUrl(cat.image || cat.imageUrl) || 'https://images.unsplash.com/photo-1542831371-29b0f74f9713?auto=format&fit=crop&q=80&w=200',
       items: catSubs.map(sub => ({
         name: sub.name,
         sub: sub.name,
-        img: sub.image?.startsWith('http') ? sub.image : (sub.image ? `${IMAGE_BASE_URL}${sub.image}` : 'https://images.unsplash.com/photo-1542831371-29b0f74f9713?auto=format&fit=crop&q=80&w=200')
+        img: cleanImageUrl(sub.image) || 'https://images.unsplash.com/photo-1542831371-29b0f74f9713?auto=format&fit=crop&q=80&w=200'
       }))
     };
     return acc;
@@ -162,6 +162,7 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, onLoginClick,
                 </div>
 
                 <button onClick={() => onNavigate('contact')} className={`pb-1 transition-all ${currentPage === 'contact' ? 'text-emerald-700 dark:text-emerald-400 scale-105' : 'text-gray-500 hover:text-emerald-600 dark:text-gray-400 dark:hover:text-emerald-400'}`}>Contact</button>
+                <button onClick={() => onNavigate('feeds')} className={`pb-1 transition-all ${currentPage === 'feeds' ? 'text-emerald-700 dark:text-emerald-400 scale-105' : 'text-gray-500 hover:text-emerald-600 dark:text-gray-400 dark:hover:text-emerald-400'}`}>Feeds</button>
               </div>
             ) : (
               <div className="w-full max-w-2xl relative animate-[fadeIn_0.3s_ease-out] flex items-center h-full">
@@ -191,7 +192,7 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, onLoginClick,
                               onClick={() => handleSuggestionClick(prod)}
                               className="w-full flex items-center gap-4 p-4 hover:bg-emerald-50 transition-colors text-left cursor-pointer"
                             >
-                              <img src={prod.image} alt={prod.name} className="w-12 h-12 rounded-lg object-cover border border-gray-100" />
+                              <img src={cleanImageUrl(prod.image)} alt={prod.name} className="w-12 h-12 rounded-lg object-cover border border-gray-100" />
                               <div className="flex-1">
                                 <div className="text-sm font-black text-gray-900">{prod.name}</div>
                                 <div className="text-xs text-emerald-600 font-black mt-0.5">₹{prod.price}</div>
@@ -253,7 +254,7 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, onLoginClick,
                 <button className="flex items-center gap-3 bg-gray-50 hover:bg-white px-1.5 md:px-4 py-1.5 rounded-2xl border border-gray-100 hover:border-emerald-100 transition-all duration-300">
                   <div className="w-8 h-8 md:w-9 md:h-9 rounded-xl bg-emerald-600 overflow-hidden border-2 border-white shadow-sm flex-shrink-0">
                     {user.profileImage || user.profilePicture ? (
-                      <img src={user.profileImage || user.profilePicture} alt={user.name} className="w-full h-full object-cover" />
+                      <img src={cleanImageUrl(user.profileImage || user.profilePicture)} alt={user.name} className="w-full h-full object-cover" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-white">
                         <UserCircle size={20} />
@@ -339,7 +340,7 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, onLoginClick,
                           onClick={() => handleSuggestionClick(prod)}
                           className="w-full flex items-center gap-4 p-4 active:bg-emerald-50 transition-colors cursor-pointer text-left"
                         >
-                          <img src={prod.image} alt={prod.name} className="w-14 h-14 rounded-xl object-cover border border-gray-100" />
+                          <img src={cleanImageUrl(prod.image)} alt={prod.name} className="w-14 h-14 rounded-xl object-cover border border-gray-100" />
                           <div className="flex-1">
                             <div className="text-sm font-black text-gray-900">{prod.name}</div>
                             <div className="text-xs text-emerald-600 font-black mt-0.5">₹{prod.price}</div>
@@ -385,7 +386,7 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, onLoginClick,
         {user && (
           <button onClick={() => onNavigate('profile')} className={`flex flex-col items-center gap-1 transition-all ${currentPage === 'profile' ? 'text-emerald-600 scale-110' : 'text-gray-400'}`}>
             <div className={`w-6 h-6 rounded-lg overflow-hidden border-2 ${currentPage === 'profile' ? 'border-emerald-600' : 'border-gray-200'}`}>
-              <img src={user.profileImage || user.profilePicture || 'https://via.placeholder.com/100'} className="w-full h-full object-cover" />
+              <img src={cleanImageUrl(user.profileImage || user.profilePicture) || 'https://via.placeholder.com/100'} className="w-full h-full object-cover" />
             </div>
             <span className="text-[9px] font-black uppercase tracking-tighter">Me</span>
           </button>
@@ -408,12 +409,13 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, onLoginClick,
                 <div>
                   <h2 className="text-2xl font-black tracking-tight leading-none">Zudo</h2>
                   <p className="text-[10px] font-bold text-white/60 uppercase tracking-widest mt-1">Premium Groceries</p>
+                  <p className="text-[8px] font-black text-amber-300 uppercase tracking-[0.2em] mt-2 animate-pulse">Buy more, enjoy more</p>
                 </div>
               </div>
               {user ? (
                 <div className="flex items-center gap-3 mt-8 p-3 bg-white/10 rounded-2xl border border-white/10">
                   <div className="w-10 h-10 rounded-xl overflow-hidden border-2 border-white/20">
-                    <img src={user.profileImage || user.profilePicture || 'https://via.placeholder.com/100'} className="w-full h-full object-cover" />
+                    <img src={cleanImageUrl(user.profileImage || user.profilePicture) || 'https://via.placeholder.com/100'} className="w-full h-full object-cover" />
                   </div>
                   <div>
                     <p className="text-xs font-black leading-none">{user.name}</p>
@@ -437,6 +439,9 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, onLoginClick,
               </button>
               <button onClick={() => { onNavigate('contact'); setIsMenuOpen(false); }} className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all ${currentPage === 'contact' ? 'bg-emerald-50 text-emerald-700' : 'text-gray-600'}`}>
                 <PhoneCall size={18} /> Contact Us
+              </button>
+              <button onClick={() => { onNavigate('feeds'); setIsMenuOpen(false); }} className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all ${currentPage === 'feeds' ? 'bg-emerald-50 text-emerald-700' : 'text-gray-600'}`}>
+                <Newspaper size={18} /> Seller Feeds
               </button>
 
               <div className="h-px bg-gray-50 my-6 mx-4"></div>
@@ -473,7 +478,7 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, onLoginClick,
             setSelectedCity(city);
             localStorage.setItem('selectedCity', city);
             if (dbName) localStorage.setItem('zudo_tenant_id', dbName);
-            // window.location.reload(); // Removed to allow viewing console logs
+            window.location.reload();
           }}
           refreshLocation={refreshLocation}
           locationLoading={locationLoading}
@@ -496,7 +501,7 @@ function LocationModal({ isOpen, onClose, selectedCity, setSelectedCity, refresh
 
   useEffect(() => {
     // Determine API URL
-    const API_BASE = window.location.hostname === 'localhost' ? 'http://localhost:5000/api' : '/api';
+    const API_BASE = API_URL;
     
     fetch(`${API_BASE}/tenancy/locations`)
       .then(res => res.json())
@@ -513,7 +518,7 @@ function LocationModal({ isOpen, onClose, selectedCity, setSelectedCity, refresh
     setLoading(true);
     setError('');
     try {
-      const API_BASE = window.location.hostname === 'localhost' ? 'http://localhost:5000/api' : '/api';
+      const API_BASE = API_URL;
       const res = await fetch(`${API_BASE}/tenancy/find/${pincode}`);
       const data = await res.json();
       if (res.ok) {
@@ -522,6 +527,7 @@ function LocationModal({ isOpen, onClose, selectedCity, setSelectedCity, refresh
           setError(`This pincode is in ${data.city}, not ${pendingCity.city}.`);
           return;
         }
+        localStorage.setItem('enteredPincode', pincode);
         setSelectedCity(data.city, data.dbName);
       } else {
         // Pincode not found - Show Request Screen
@@ -538,7 +544,7 @@ function LocationModal({ isOpen, onClose, selectedCity, setSelectedCity, refresh
     e.preventDefault();
     setLoading(true);
     try {
-      const API_BASE = window.location.hostname === 'localhost' ? 'http://localhost:5000/api' : '/api';
+      const API_BASE = API_URL;
       const res = await fetch(`${API_BASE}/tenancy/request-service`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -714,10 +720,11 @@ function LocationModal({ isOpen, onClose, selectedCity, setSelectedCity, refresh
                   // Validate the detected pincode against our central DB
                   setLoading(true);
                   try {
-                    const API_BASE = window.location.hostname === 'localhost' ? 'http://localhost:5000/api' : '/api';
+                    const API_BASE = API_URL;
                     const res = await fetch(`${API_BASE}/tenancy/find/${loc.pincode.replace(/\s/g, '')}`);
                     const data = await res.json();
                     if (res.ok) {
+                      localStorage.setItem('enteredPincode', loc.pincode.replace(/\s/g, ''));
                       setSelectedCity(data.city, data.dbName);
                     } else if (res.status === 404) {
                       // Detected pincode is not in our DB - Show Request Screen

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ShieldCheck, Clock, FileText, ArrowRight, CheckCircle2, X, Upload, FileUp, AlertCircle, Camera, CreditCard } from 'lucide-react';
-import { API_URL, IMAGE_BASE_URL } from '../config';
+import { API_URL, IMAGE_BASE_URL, cleanImageUrl } from '../config';
 
 export default function B2BVerificationScreen({ onSkip, onBack, user, onUpdateUser }) {
   const [uploading, setUploading] = useState({ doc: false, store: false, submitting: false });
@@ -8,8 +8,19 @@ export default function B2BVerificationScreen({ onSkip, onBack, user, onUpdateUs
   const [storePicUrl, setStorePicUrl] = useState(user?.storePic || '');
   const [taxId, setTaxId] = useState(user?.gstNumber || user?.panNumber || user?.aadhaarNumber || '');
   const [taxType, setTaxType] = useState('gst');
+  const [pincode, setPincode] = useState(user?.pincode || '');
   const [error, setError] = useState('');
   const [status, setStatus] = useState(user?.gstPdf ? 'uploaded' : 'pending');
+
+  React.useEffect(() => {
+    if (user) {
+      if (!docUrl) setDocUrl(user.gstPdf || '');
+      if (!storePicUrl) setStorePicUrl(user.storePic || '');
+      if (!taxId) setTaxId(user.gstNumber || user.panNumber || user.aadhaarNumber || '');
+      if (!pincode) setPincode(user.pincode || '');
+      if (status === 'pending' && user.gstPdf) setStatus('uploaded');
+    }
+  }, [user]);
 
   const handleFileUpload = async (e, type) => {
     const file = e.target.files[0];
@@ -40,7 +51,7 @@ export default function B2BVerificationScreen({ onSkip, onBack, user, onUpdateUs
       const data = await response.json();
       if (!response.ok) throw new Error(data.message || 'Upload failed');
 
-      const savedUrl = `${IMAGE_BASE_URL}${data.url}`;
+      const savedUrl = cleanImageUrl(`${IMAGE_BASE_URL}${data.url}`);
       console.log(`STEP 2: Received HOSTINGER URL:`, savedUrl);
 
       if (type === 'doc') setDocUrl(savedUrl);
@@ -55,8 +66,8 @@ export default function B2BVerificationScreen({ onSkip, onBack, user, onUpdateUs
   };
 
   const handleSubmit = async () => {
-    if (!docUrl || !storePicUrl || !taxId) {
-      setError('Please provide all required business details and both images.');
+    if (!docUrl || !storePicUrl || !taxId || !pincode) {
+      setError('Please provide all required business details, pincode and both images.');
       return;
     }
 
@@ -70,6 +81,7 @@ export default function B2BVerificationScreen({ onSkip, onBack, user, onUpdateUs
         gstNumber: taxType === 'gst' ? taxId : '',
         panNumber: taxType === 'pan' ? taxId : '',
         aadhaarNumber: taxType === 'aadhaar' ? taxId : '',
+        pincode,
         isWaitingApproval: true
       };
 
@@ -155,15 +167,26 @@ export default function B2BVerificationScreen({ onSkip, onBack, user, onUpdateUs
                     </button>
                   ))}
                 </div>
-                <div className="relative group">
-                  <CreditCard className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-emerald-600" size={18} />
-                  <input
-                    type="text"
-                    value={taxId}
-                    onChange={(e) => setTaxId(e.target.value)}
-                    placeholder={`Enter ${taxType.toUpperCase()} Number`}
-                    className="w-full pl-12 pr-4 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl outline-none font-bold text-sm"
-                  />
+                <div className="flex gap-2">
+                  <div className="relative group flex-[2]">
+                    <CreditCard className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-emerald-600" size={18} />
+                    <input
+                      type="text"
+                      value={taxId}
+                      onChange={(e) => setTaxId(e.target.value)}
+                      placeholder={`Enter ${taxType.toUpperCase()} Number`}
+                      className="w-full pl-12 pr-4 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl outline-none font-bold text-sm"
+                    />
+                  </div>
+                  <div className="relative group flex-1">
+                    <input
+                      type="text"
+                      value={pincode}
+                      onChange={(e) => setPincode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      placeholder="Pincode"
+                      className="w-full px-4 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl outline-none font-bold text-sm text-center"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -174,14 +197,28 @@ export default function B2BVerificationScreen({ onSkip, onBack, user, onUpdateUs
                     {uploading.doc ? <div className="w-6 h-6 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin"></div> : docUrl ? <CheckCircle2 className="text-emerald-600" /> : <FileUp className="text-gray-400" />}
                     <input type="file" className="hidden" accept=".pdf,image/*" onChange={(e) => handleFileUpload(e, 'doc')} />
                   </label>
+                  <input 
+                    type="text"
+                    placeholder="Or paste license URL..."
+                    value={docUrl}
+                    onChange={(e) => setDocUrl(e.target.value)}
+                    className="w-full bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-2xl py-2 px-3 outline-none font-bold text-[9px] focus:border-emerald-500 transition-all dark:text-white"
+                  />
                 </div>
 
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Store Picture</label>
                   <label className={`relative flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-3xl cursor-pointer transition-all ${storePicUrl ? 'bg-emerald-50 border-emerald-200' : 'bg-gray-50 border-gray-100'}`}>
-                    {uploading.store ? <div className="w-6 h-6 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin"></div> : storePicUrl ? <img src={storePicUrl} className="w-full h-full object-cover rounded-2xl" /> : <Camera className="text-gray-400" />}
+                    {uploading.store ? <div className="w-6 h-6 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin"></div> : storePicUrl ? <img src={cleanImageUrl(storePicUrl)} className="w-full h-full object-cover rounded-2xl" /> : <Camera className="text-gray-400" />}
                     <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, 'store')} />
                   </label>
+                  <input 
+                    type="text"
+                    placeholder="Or paste store pic URL..."
+                    value={storePicUrl}
+                    onChange={(e) => setStorePicUrl(e.target.value)}
+                    className="w-full bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-2xl py-2 px-3 outline-none font-bold text-[9px] focus:border-emerald-500 transition-all dark:text-white"
+                  />
                 </div>
               </div>
 

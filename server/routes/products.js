@@ -4,11 +4,46 @@ const multer = require('multer');
 const xlsx = require('xlsx');
 const path = require('path');
 const fs = require('fs');
+const mongoose = require('mongoose');
 const Product = require('../models/Product');
 const Category = require('../models/Category');
 const SubCategory = require('../models/SubCategory');
 const Seller = require('../models/Seller');
 const { protect } = require('../middleware/auth');
+
+// Helper to find commission for product
+const findCommissionForProduct = (product, commissions) => {
+  const pCatId = product.categoryId?._id?.toString() || product.categoryId?.toString();
+  if (!pCatId) return null;
+  
+  const catCommissions = commissions.filter(c => c.categoryId?.toString() === pCatId);
+  if (catCommissions.length === 0) return null;
+  
+  // 1. Try to find a unit-specific match (case-insensitive)
+  if (product.unit) {
+    const unitMatch = catCommissions.find(c => c.unit && c.unit.trim().toLowerCase() === product.unit.trim().toLowerCase());
+    if (unitMatch) return unitMatch;
+  }
+  
+  // 2. Fall back to a commission with no unit specified
+  const fallbackMatch = catCommissions.find(c => !c.unit);
+  if (fallbackMatch) return fallbackMatch;
+  
+  // 3. Permissive fallback to first category commission if no unit matches and no unitless exists
+  return catCommissions[0] || null;
+};
+
+// Helper to calculate commissioned price
+const getCommissionedPrice = (productPrice, commission) => {
+  if (!commission) return productPrice;
+  let value = Number(commission.commissionValue) || 0;
+  if (commission.commissionType === 'flat') {
+    return productPrice + value;
+  } else if (commission.commissionType === 'percentage') {
+    return productPrice + Math.round(productPrice * value / 100);
+  }
+  return productPrice;
+};
 
 // Configure Multer for persistent storage
 const storage = multer.diskStorage({
@@ -43,10 +78,26 @@ router.get('/', async (req, res) => {
     const products = await Product.find().populate('categoryId').populate('subCategoryId');
     console.log(`[DEBUG] Found ${products.length} products`);
     
+    // Fetch all commissions
+    const Commission = require('../models/Commission');
+    const commissions = await Commission.find();
+    
     // Manually fetch seller names to be 100% sure
     const productsWithSellers = await Promise.all(products.map(async (product) => {
       try {
         const p = product.toObject();
+        
+        // Apply commission
+        const comm = findCommissionForProduct(p, commissions);
+        if (comm) {
+          p.originalPrice = p.price;
+          p.price = getCommissionedPrice(p.price, comm);
+          if (p.b2bPrice) {
+            p.originalB2BPrice = p.b2bPrice;
+            p.b2bPrice = getCommissionedPrice(p.b2bPrice, comm);
+          }
+        }
+
         if (p.sellerId) {
           // Try Mongoose first
           let seller = await Seller.findById(p.sellerId);

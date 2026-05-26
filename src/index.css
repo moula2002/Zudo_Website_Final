@@ -114,4 +114,12 @@
     from { opacity: 0; transform: translateY(-10px); }
     to { opacity: 1; transform: translateY(0); }
   }
+
+  @keyframes deliveryMove {
+    0% { top: 10%; left: 10%; transform: rotate(10deg); }
+    25% { top: 30%; left: 70%; transform: rotate(-5deg); }
+    50% { top: 80%; left: 40%; transform: rotate(15deg); }
+    75% { top: 40%; left: 20%; transform: rotate(-10deg); }
+    100% { top: 10%; left: 10%; transform: rotate(10deg); }
+  }
 }

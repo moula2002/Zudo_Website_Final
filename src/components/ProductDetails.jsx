@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ShoppingCart, Heart, ArrowLeft, Star, Plus, Minus, Share2, Package, Truck, ShieldCheck, Clock, X, CheckCircle2, Upload, Camera, Image as ImageIcon, Trash2 } from 'lucide-react';
-import { API_URL, API_BASE_URL, IMAGE_BASE_URL } from '../config';
+import { API_URL, API_BASE_URL, IMAGE_BASE_URL, cleanImageUrl } from '../config';
 import ProductCard from './ProductCard';
 
 export default function ProductDetails({ product, onAddToCart, onToggleWishlist, isWishlisted, onNavigate, onNavigateToProduct, wishlistItems, cartItems, onUpdateQuantity, allProducts, isB2B, user }) {
@@ -60,7 +60,7 @@ export default function ProductDetails({ product, onAddToCart, onToggleWishlist,
       });
       if (!response.ok) throw new Error('Upload failed');
       const data = await response.json();
-      const imageUrl = `${IMAGE_BASE_URL}${data.url}`;
+      const imageUrl = cleanImageUrl(`${IMAGE_BASE_URL}${data.url}`);
       setNewReview(prev => ({
         ...prev,
         media: [...prev.media, { url: imageUrl, type: 'image' }]
@@ -132,7 +132,7 @@ export default function ProductDetails({ product, onAddToCart, onToggleWishlist,
         <div className="space-y-4">
           <div className="aspect-square bg-gray-50 dark:bg-white/5 rounded-2xl overflow-hidden group relative border border-gray-100 dark:border-white/10 transition-colors">
             <img 
-              src={(product.image || product.imageUrl)?.startsWith('http') ? (product.image || product.imageUrl) : `${IMAGE_BASE_URL}${product.image || product.imageUrl}`} 
+              src={cleanImageUrl(product.image || product.imageUrl)} 
               alt={product.name} 
               className="w-full h-full object-contain p-6 transition-transform duration-500 group-hover:scale-105" 
             />
@@ -147,7 +147,7 @@ export default function ProductDetails({ product, onAddToCart, onToggleWishlist,
             {[...Array(4)].map((_, i) => (
               <div key={i} className="aspect-square bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-100 dark:border-white/10 hover:border-emerald-200 transition-all overflow-hidden p-2 opacity-60 hover:opacity-100 cursor-pointer">
                 <img 
-                  src={(product.image || product.imageUrl)?.startsWith('http') ? (product.image || product.imageUrl) : `${IMAGE_BASE_URL}${product.image || product.imageUrl}`} 
+                  src={cleanImageUrl(product.image || product.imageUrl)} 
                   className="w-full h-full object-contain" 
                 />
               </div>
@@ -233,8 +233,8 @@ export default function ProductDetails({ product, onAddToCart, onToggleWishlist,
                 <div className="px-4 py-2 bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 rounded-xl border border-amber-100 dark:border-amber-500/20 flex items-center gap-2">
                   <Package size={14} />
                   <div className="flex flex-col">
-                    <span className="text-[8px] font-black uppercase tracking-widest leading-none mb-1">Min. Order Qty</span>
-                    <span className="text-xs font-bold leading-none">{product.moq || 1} {product.unit || 'Units'}</span>
+                    <span className="text-[8px] font-black uppercase tracking-widest leading-none mb-1">B2B Verified</span>
+                    <span className="text-xs font-bold leading-none">Wholesale Pricing</span>
                   </div>
                 </div>
               )}
@@ -445,7 +445,7 @@ export default function ProductDetails({ product, onAddToCart, onToggleWishlist,
                         <div className="flex gap-2">
                           {review.media.map((item, idx) => (
                             <div key={idx} className="w-20 h-20 rounded-xl overflow-hidden border border-gray-50 shadow-sm">
-                              <img src={item.url} className="w-full h-full object-cover" />
+                              <img src={cleanImageUrl(item.url)} className="w-full h-full object-cover" />
                             </div>
                           ))}
                         </div>

@@ -21,12 +21,17 @@ const orderSchema = new mongoose.Schema({
       type: Number,
       required: true
     },
+    normalPrice: {
+      type: Number
+    },
     image: String,
+    sellerName: String,
     // Add nested product for frontend compatibility
     product: {
       name: String,
       image: String,
-      imageUrl: String
+      imageUrl: String,
+      sellerName: String
     }
   }],
   totalAmount: {
@@ -53,7 +58,7 @@ const orderSchema = new mongoose.Schema({
   },
   orderStatus: {
     type: String,
-    enum: ['Pending', 'Processing', 'Shipped', 'Delivered', 'Cancelled', 'Returned'],
+    enum: ['Pending', 'Processing', 'Shipped', 'Out for Delivery', 'Delivered', 'Cancelled', 'Returned'],
     default: 'Processing'
   },
   deliveryOtp: {
@@ -63,6 +68,10 @@ const orderSchema = new mongoose.Schema({
   cashPersonId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'CashCollector'
+  },
+  driverId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Driver'
   },
   returnReason: {
     type: String,

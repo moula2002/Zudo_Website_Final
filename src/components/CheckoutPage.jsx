@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { CreditCard, Truck, MapPin, Phone, User, CheckCircle2, ChevronRight, ArrowLeft, Search, AlertTriangle } from 'lucide-react';
+import { CreditCard, Truck, MapPin, Phone, User, CheckCircle2, ChevronRight, ArrowLeft, Search, AlertTriangle, QrCode, Banknote } from 'lucide-react';
 import { useLocation } from '../hooks/useLocation';
-import { API_URL } from '../config';
+import { API_URL, cleanImageUrl } from '../config';
 
 export default function CheckoutPage({ cartItems, onNavigate, user, onOrderSuccess }) {
   const { address: liveAddress, city: liveCity, refresh: getLiveLocation, loading: locationLoading } = useLocation();
@@ -68,10 +68,16 @@ export default function CheckoutPage({ cartItems, onNavigate, user, onOrderSucce
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setShippingData({ ...shippingData, [name]: value });
+    
+    // Strict 6-digit pincode validation
     if (name === 'pincode') {
-      checkPincode(value);
+      const sanitized = value.replace(/\D/g, '').slice(0, 6);
+      setShippingData({ ...shippingData, [name]: sanitized });
+      checkPincode(sanitized);
+      return;
     }
+
+    setShippingData({ ...shippingData, [name]: value });
   };
 
   const handlePlaceOrder = async (e) => {
@@ -88,18 +94,14 @@ export default function CheckoutPage({ cartItems, onNavigate, user, onOrderSucce
       items: cartItems.map(item => {
         const priceStr = String(item.price);
         let basePrice = parseInt(priceStr.replace(/[^\d]/g, '')) || 0;
-        
-        // If B2B, apply 25% discount to the stored price
-        if (isB2B) {
-          basePrice = Math.floor(basePrice * 0.75);
-        }
 
         return {
           product: item.id,
           name: item.name,
           image: item.image,
           quantity: item.quantity,
-          price: basePrice
+          price: basePrice,
+          sellerName: item.sellerName || 'Zudo Official'
         };
       }),
       totalAmount: total,
@@ -124,58 +126,16 @@ export default function CheckoutPage({ cartItems, onNavigate, user, onOrderSucce
       });
 
       const data = await response.json();
-
       if (!response.ok) throw new Error(data.message);
 
-      if (paymentMethod === 'Razorpay') {
-        // Razorpay logic would go here
-        // For demo, we just proceed to success
-        handleRazorpayPayment(data);
-      } else {
-        setPlacedOrder(data);
-        setOrderComplete(true);
-        if (onOrderSuccess) onOrderSuccess();
-      }
+      setPlacedOrder(data);
+      setOrderComplete(true);
+      if (onOrderSuccess) onOrderSuccess();
     } catch (err) {
       alert(err.message);
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleRazorpayPayment = (order) => {
-    const options = {
-      key: "rzp_test_placeholder", // Replace with real key
-      amount: order.totalAmount * 100,
-      currency: "INR",
-      name: "Zudo",
-      description: "Order Payment",
-      order_id: order.razorpayOrderId,
-      handler: async function (response) {
-        // Verify payment on backend
-        const verifyResponse = await fetch(`${API_URL}/orders/verify`, {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          },
-          body: JSON.stringify(response)
-        });
-        if (verifyResponse.ok) {
-          setPlacedOrder(order); // 'order' is passed as argument to handleRazorpayPayment
-          setOrderComplete(true);
-          if (onOrderSuccess) onOrderSuccess();
-        }
-      },
-      prefill: {
-        name: user?.name,
-        email: user?.email,
-        contact: shippingData.phone
-      },
-      theme: { color: "#059669" }
-    };
-    const rzp = new window.Razorpay(options);
-    rzp.open();
   };
 
   if (orderComplete) {
@@ -187,12 +147,41 @@ export default function CheckoutPage({ cartItems, onNavigate, user, onOrderSucce
         <h2 className="text-3xl font-black text-gray-900 mb-2">Order Placed Successfully!</h2>
         <p className="text-gray-500 max-w-md mb-8">Thank you for shopping with Zudo. Your fresh groceries will be delivered shortly.</p>
         
+        {placedOrder?.paymentMethod === 'COD_QR' && (
+          <div className="mb-8 bg-white border-2 border-emerald-100 p-6 rounded-[2.5rem] shadow-xl max-w-sm w-full animate-[fadeIn_0.5s_ease-out]">
+            <div className="flex flex-col items-center">
+              <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600 mb-4">
+                <QrCode size={24} />
+              </div>
+              <h4 className="text-lg font-black text-gray-900 mb-1">Pay via QR</h4>
+              <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-3 py-1 rounded-full mb-6">Status: Pending QR Scan</p>
+              
+              <div className="w-48 h-48 bg-gray-50 rounded-3xl border-4 border-emerald-50 flex items-center justify-center mb-6 relative overflow-hidden group">
+                <img 
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=upi://pay?pa=zudo@upi&pn=Zudo&am=${total}&cu=INR`} 
+                  alt="Payment QR" 
+                  className="w-40 h-40 group-hover:scale-110 transition-transform duration-500"
+                />
+                <div className="absolute inset-0 border-2 border-emerald-500/20 rounded-2xl pointer-events-none"></div>
+              </div>
+
+              <div className="text-center space-y-1">
+                <p className="text-xs font-black text-gray-900 uppercase tracking-tight">Total to Pay: ₹{total}</p>
+                <p className="text-[10px] font-bold text-gray-400 max-w-[200px] mx-auto leading-tight uppercase">Scan this QR or show it to the delivery partner upon arrival</p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {placedOrder?.deliveryOtp && (
           <div className="mb-10 bg-[#107569] text-white p-8 rounded-[2.5rem] shadow-2xl shadow-emerald-900/20 relative overflow-hidden group max-w-sm w-full">
             <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl"></div>
-            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-emerald-200 mb-3">Your Delivery OTP</p>
+            <div className="flex items-center gap-2 mb-3">
+              <Truck size={14} className="text-emerald-300" />
+              <p className="text-[10px] font-black uppercase tracking-[0.3em] text-emerald-200">Delivery OTP</p>
+            </div>
             <p className="text-5xl font-black tracking-[0.5em] font-mono mb-4">{placedOrder.deliveryOtp}</p>
-            <p className="text-[10px] font-bold text-emerald-100/60 leading-tight">Please keep this code safe. You'll need to share it with the delivery partner at the time of collection.</p>
+            <p className="text-[10px] font-bold text-emerald-100/60 leading-tight">Share this code with the partner during delivery.</p>
           </div>
         )}
 
@@ -245,7 +234,7 @@ export default function CheckoutPage({ cartItems, onNavigate, user, onOrderSucce
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Email Address</label>
+                <label className="block text-xs font-black text-gray-900 uppercase tracking-[0.1em] mb-2">Email Address</label>
                 <div className="relative">
                   <CheckCircle2 size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
                   <input 
@@ -260,7 +249,7 @@ export default function CheckoutPage({ cartItems, onNavigate, user, onOrderSucce
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Phone Number</label>
+                <label className="block text-xs font-black text-gray-900 uppercase tracking-[0.1em] mb-2">Phone Number</label>
                 <div className="relative">
                   <Phone size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
                   <input 
@@ -275,16 +264,18 @@ export default function CheckoutPage({ cartItems, onNavigate, user, onOrderSucce
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Pincode</label>
+                <label className="block text-xs font-black text-gray-900 uppercase tracking-[0.1em] mb-2">Pincode</label>
                   <div className="relative group">
                     <MapPin size={16} className={`absolute left-4 top-1/2 -translate-y-1/2 transition-colors ${pincodeError ? 'text-red-500' : 'text-gray-400'}`} />
-                    <input 
-                      type="text" 
-                      name="pincode"
-                      value={shippingData.pincode}
-                      onChange={handleInputChange}
-                      placeholder="6-digit pincode" 
-                      className={`w-full pl-12 pr-4 py-3.5 rounded-2xl border-2 transition-all font-black text-sm outline-none ${
+                      <input 
+                        type="text" 
+                        name="pincode"
+                        value={shippingData.pincode}
+                        onChange={handleInputChange}
+                        placeholder="6-digit pincode" 
+                        maxLength="6"
+                        inputMode="numeric"
+                        className={`w-full pl-12 pr-4 py-3.5 rounded-2xl border-2 transition-all font-black text-sm outline-none ${
                         pincodeError 
                           ? 'border-red-100 bg-red-50 text-red-900 placeholder:text-red-300 focus:border-red-500 focus:ring-4 focus:ring-red-500/10' 
                           : 'border-gray-100 bg-gray-50/50 text-gray-900 focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10'
@@ -398,7 +389,7 @@ export default function CheckoutPage({ cartItems, onNavigate, user, onOrderSucce
                 />
               </div>
               <div className="md:col-span-2">
-                <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">City</label>
+                <label className="block text-xs font-black text-gray-900 uppercase tracking-[0.1em] mb-2">City</label>
                 <input 
                   type="text" 
                   name="city"
@@ -419,6 +410,7 @@ export default function CheckoutPage({ cartItems, onNavigate, user, onOrderSucce
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <button 
+                type="button"
                 onClick={() => setPaymentMethod('COD')}
                 className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all ${paymentMethod === 'COD' ? 'border-emerald-600 bg-emerald-50/50' : 'border-gray-100 hover:border-gray-200'}`}
               >
@@ -427,28 +419,31 @@ export default function CheckoutPage({ cartItems, onNavigate, user, onOrderSucce
                     {paymentMethod === 'COD' && <div className="w-3 h-3 bg-emerald-600 rounded-full" />}
                   </div>
                   <div className="text-left">
-                    <p className="font-bold text-gray-900">Cash on Delivery</p>
-                    <p className="text-xs text-gray-500">Pay when you receive</p>
+                    <p className="font-black text-gray-900 text-sm">Cash on Delivery</p>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Pay cash at your doorstep</p>
                   </div>
                 </div>
-                <Truck size={24} className="text-gray-400" />
+                <Banknote size={24} className="text-emerald-600/40" />
               </button>
 
-              <button 
-                onClick={() => setPaymentMethod('Razorpay')}
-                className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all ${paymentMethod === 'Razorpay' ? 'border-emerald-600 bg-emerald-50/50' : 'border-gray-100 hover:border-gray-200'}`}
-              >
-                <div className="flex items-center gap-4">
-                  <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${paymentMethod === 'Razorpay' ? 'border-emerald-600' : 'border-gray-300'}`}>
-                    {paymentMethod === 'Razorpay' && <div className="w-3 h-3 bg-emerald-600 rounded-full" />}
+              {(user?.role === 'b2b' || localStorage.getItem('isB2B') === 'true') && (
+                <button 
+                  type="button"
+                  onClick={() => setPaymentMethod('COD_QR')}
+                  className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all ${paymentMethod === 'COD_QR' ? 'border-emerald-600 bg-emerald-50/50' : 'border-gray-100 hover:border-gray-200'}`}
+                >
+                  <div className="flex items-center gap-4">
+                    <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${paymentMethod === 'COD_QR' ? 'border-emerald-600' : 'border-gray-300'}`}>
+                      {paymentMethod === 'COD_QR' && <div className="w-3 h-3 bg-emerald-600 rounded-full" />}
+                    </div>
+                    <div className="text-left">
+                      <p className="font-black text-gray-900 text-sm">Pay on Delivery (QR)</p>
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Scan QR code at delivery</p>
+                    </div>
                   </div>
-                  <div className="text-left">
-                    <p className="font-bold text-gray-900">Online Payment</p>
-                    <p className="text-xs text-gray-500">Razorpay / UPI / Cards</p>
-                  </div>
-                </div>
-                <div className="px-2 py-1 bg-blue-50 rounded-lg text-[10px] font-black text-blue-600 uppercase tracking-tighter italic">Razorpay</div>
-              </button>
+                  <QrCode size={24} className="text-emerald-600/40" />
+                </button>
+              )}
             </div>
           </section>
         </div>
@@ -462,7 +457,7 @@ export default function CheckoutPage({ cartItems, onNavigate, user, onOrderSucce
                 <div key={item.id} className="flex justify-between items-center gap-4">
                   <div className="flex items-center gap-3">
                     <div className="w-12 h-12 rounded-lg bg-gray-50 flex-shrink-0 overflow-hidden border border-gray-100">
-                      <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                      <img src={cleanImageUrl(item.image)} alt={item.name} className="w-full h-full object-cover" />
                     </div>
                     <div>
                       <p className="text-sm font-bold text-gray-800 line-clamp-1">{item.name}</p>
@@ -487,11 +482,26 @@ export default function CheckoutPage({ cartItems, onNavigate, user, onOrderSucce
                 <span className="text-lg font-black text-gray-900">Total</span>
                 <span className="text-2xl font-black text-emerald-600">₹{total}</span>
               </div>
+              {localStorage.getItem('isB2B') === 'true' && total < 2000 && (
+                <div className="mt-4 p-3 bg-red-50 border border-red-100 rounded-xl flex items-center gap-2">
+                  <AlertTriangle size={16} className="text-red-500 flex-shrink-0" />
+                  <p className="text-[10px] font-black text-red-600 uppercase tracking-widest leading-tight">
+                    Minimum order for B2B is ₹2000. Add ₹{2000 - total} more.
+                  </p>
+                </div>
+              )}
             </div>
 
             <button 
-              onClick={handlePlaceOrder}
-              disabled={loading || !!pincodeError || !shippingData.name || !shippingData.email || !shippingData.phone || !shippingData.address || !shippingData.city || !shippingData.pincode}
+              onClick={(e) => {
+                const isB2B = localStorage.getItem('isB2B') === 'true';
+                if (isB2B && total < 2000) {
+                  alert('B2B orders must be at least ₹2000. Please add more items to your cart.');
+                  return;
+                }
+                handlePlaceOrder(e);
+              }}
+              disabled={loading || !!pincodeError || !shippingData.name || !shippingData.email || !shippingData.phone || !shippingData.address || !shippingData.city || !shippingData.pincode || (localStorage.getItem('isB2B') === 'true' && total < 2000)}
               className={`w-full mt-8 bg-emerald-600 hover:bg-emerald-700 text-white font-black py-4 rounded-2xl shadow-xl shadow-emerald-600/30 transform hover:-translate-y-1 transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none`}
             >
               {loading ? (

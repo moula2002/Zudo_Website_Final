@@ -1,5 +1,6 @@
 import React from 'react';
 import { Trash2, ArrowLeft, ShoppingBag, CreditCard, ChevronRight, ShieldCheck, Clock } from 'lucide-react';
+import { cleanImageUrl } from '../config';
 
 export default function CartPage({ cartItems, onUpdateQuantity, onRemove, onNavigate, isB2B }) {
   const user = JSON.parse(localStorage.getItem('user') || 'null');
@@ -95,7 +96,7 @@ export default function CartPage({ cartItems, onUpdateQuantity, onRemove, onNavi
                 {cartItems.map(item => (
                   <div key={item.id} className="flex flex-col sm:flex-row sm:items-center gap-6 p-8 hover:bg-emerald-50/10 transition-all group">
                     <div className="w-24 h-24 bg-gray-50 rounded-2xl overflow-hidden flex-shrink-0 border border-gray-100 group-hover:scale-105 transition-transform duration-500">
-                      {item.image && <img src={item.image} alt={item.name} className="w-full h-full object-cover" />}
+                      {item.image && <img src={cleanImageUrl(item.image)} alt={item.name} className="w-full h-full object-cover" />}
                     </div>
                     
                     <div className="flex-grow">
@@ -184,9 +185,25 @@ export default function CartPage({ cartItems, onUpdateQuantity, onRemove, onNavi
                 </div>
               </div>
 
+              {isB2B && subtotal < 2000 && (
+                <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-2xl flex items-center gap-3 animate-pulse">
+                  <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                  <p className="text-[10px] font-black text-red-600 uppercase tracking-widest leading-tight">
+                    Minimum B2B order value is ₹2000. Add ₹{2000 - subtotal} more.
+                  </p>
+                </div>
+              )}
+
               <button 
-                onClick={() => onNavigate('checkout')}
-                className="w-full bg-[#107569] hover:bg-[#0d6359] text-white font-black py-5 rounded-2xl shadow-2xl shadow-emerald-900/20 transform hover:-translate-y-1 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3 group"
+                onClick={() => {
+                  if (isB2B && subtotal < 2000) {
+                    alert('B2B orders must be at least ₹2000');
+                    return;
+                  }
+                  onNavigate('checkout');
+                }}
+                disabled={isB2B && subtotal < 2000}
+                className={`w-full ${isB2B && subtotal < 2000 ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#107569] hover:bg-[#0d6359]'} text-white font-black py-5 rounded-2xl shadow-2xl shadow-emerald-900/20 transform hover:-translate-y-1 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3 group`}
               >
                 Proceed to Checkout
                 <ChevronRight size={20} className="group-hover:translate-x-1 transition-transform" />

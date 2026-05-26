@@ -21,15 +21,19 @@ import ProfilePage from './components/ProfilePage';
 import OrdersPage from './components/OrdersPage';
 import PolicyPage from './components/PolicyPage';
 import ResetPasswordPage from './components/ResetPasswordPage';
+import FeedsPage from './components/FeedsPage';
 import { API_URL, API_BASE_URL } from './config';
 import { MapPin } from 'lucide-react';
 import LocationGateway from './components/LocationGateway';
+import PopupAdModal from './components/PopupAdModal';
 import './App.css';
 
 const SUPPORTED_MAPPING = {
   'bangalore': 'zudo-bengaluru',
   'bengaluru': 'zudo-bengaluru',
-  'mysore': 'zudo-mysore'
+  'mysore': 'zudo-mysore',
+  'kozhikode': 'zudo-kozhikode',
+  'coimbatore': 'zudo-coimbatore'
 };
 
 function App() {
@@ -92,7 +96,7 @@ function App() {
     } else {
       // Map kebab-case URL to camelCase page state
       const page = path.slice(1).replace(/-([a-z])/g, (g) => g[1].toUpperCase());
-      const validPages = ['products', 'productDetails', 'cart', 'wishlist', 'checkout', 'profile', 'orders', 'contact', 'terms', 'privacy', 'shipping', 'returns', 'resetPassword'];
+      const validPages = ['products', 'productDetails', 'cart', 'wishlist', 'checkout', 'profile', 'orders', 'contact', 'terms', 'privacy', 'shipping', 'returns', 'resetPassword', 'feeds'];
       if (validPages.includes(page)) {
         setCurrentPage(page);
       }
@@ -330,7 +334,7 @@ function App() {
   };
 
   const addToCart = (product) => {
-    const initialQty = isB2B ? (product.moq || 4) : 1;
+    const initialQty = 1;
     setCartItems(prev => {
       const existing = prev.find(item => item.id === product.id);
       if (existing) {
@@ -348,14 +352,7 @@ function App() {
   const updateCartQuantity = (id, delta) => {
     setCartItems(prev => prev.map(item => {
       if (item.id === id) {
-        const minQty = (isB2B && item.moq) ? item.moq : 0;
         const newQty = item.quantity + delta;
-        
-        // If it's a B2B item and we're trying to go below MOQ, remove it
-        if (isB2B && item.moq && newQty < item.moq && delta < 0) {
-          return { ...item, quantity: 0 };
-        }
-        
         return { ...item, quantity: Math.max(0, newQty) };
       }
       return item;
@@ -389,14 +386,11 @@ function App() {
   const navigateToProduct = (product) => { setSelectedProduct(product); setCurrentPage('productDetails'); };
 
   const getDisplayPrice = (product) => {
-    const isUserB2B = user?.role === 'business' || user?.role === 'b2b';
-    if (isUserB2B && !user.isVerified) {
-       return { price: "Verification Pending", oldPrice: null, isB2B: true };
-    }
+    const basePrice = product.b2bPrice || product.price;
     return { 
-      price: isUserB2B ? `₹${product.b2bPrice || product.price}` : `₹${product.price}`, 
-        oldPrice: product.oldPrice,
-      isB2B: isUserB2B 
+      price: `₹${basePrice}`, 
+      oldPrice: product.oldPrice,
+      isB2B: false 
     };
   };
 
@@ -520,7 +514,20 @@ function App() {
             {currentPage === 'wishlist' && <WishlistPage wishlistItems={wishlistItems} cartItems={cartItems} onAddToCart={addToCart} onUpdateQuantity={updateCartQuantity} onToggleWishlist={toggleWishlist} onNavigate={handleNavigate} onNavigateToProduct={navigateToProduct} />}
             {currentPage === 'checkout' && <CheckoutPage cartItems={cartItems} user={user} onNavigate={handleNavigate} onOrderSuccess={() => { setCartItems([]); showToast('Order placed!'); handleNavigate('home'); }} />}
             {currentPage === 'profile' && <ProfilePage user={user} onUpdateUser={setUser} onNavigate={handleNavigate} initialTab={profileTab} />}
-            {currentPage === 'orders' && <OrdersPage onNavigate={handleNavigate} />}
+            {currentPage === 'orders' && <OrdersPage onNavigate={handleNavigate} user={user} />}
+            {currentPage === 'feeds' && (
+              <FeedsPage 
+                allProducts={allProducts}
+                onAddToCart={addToCart}
+                onUpdateQuantity={updateCartQuantity}
+                onToggleWishlist={toggleWishlist}
+                cartItems={cartItems}
+                wishlistItems={wishlistItems}
+                onNavigateToProduct={navigateToProduct}
+                getDisplayPrice={getDisplayPrice}
+                onNavigate={handleNavigate}
+              />
+            )}
             {currentPage === 'contact' && <ContactPage />}
             
             {/* Policy Pages */}
@@ -535,6 +542,7 @@ function App() {
 
       <Footer onNavigate={handleNavigate} />
       {isLoginOpen && <LoginModal onClose={() => setIsLoginOpen(false)} setUser={setUser} />}
+      <PopupAdModal />
 
       {locationNotAvailable && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-6">

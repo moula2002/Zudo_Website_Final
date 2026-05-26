@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Package, Calendar, Clock, ChevronRight, ShoppingBag, ArrowLeft, CheckCircle2, Truck, AlertCircle, MapPin, Receipt, ExternalLink, ChevronDown, ChevronUp, User, Phone, Camera, Upload, X } from 'lucide-react';
-import { API_URL, API_BASE_URL, IMAGE_BASE_URL } from '../config';
+import { Package, Calendar, Clock, ChevronRight, ShoppingBag, ArrowLeft, CheckCircle2, Truck, AlertCircle, MapPin, Receipt, ExternalLink, ChevronDown, ChevronUp, User, Phone, Camera, Upload, X, Search, Filter, Navigation as NavIcon } from 'lucide-react';
+import { API_URL, API_BASE_URL, IMAGE_BASE_URL, cleanImageUrl } from '../config';
+import { generateInvoice } from '../utils/invoiceGenerator';
 
-export default function OrdersPage({ onNavigate }) {
+export default function OrdersPage({ onNavigate, user }) {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expandedOrder, setExpandedOrder] = useState(null);
@@ -14,6 +15,71 @@ export default function OrdersPage({ onNavigate }) {
   const [returnModal, setReturnModal] = useState({ open: false, order: null });
   const [returnForm, setReturnForm] = useState({ selectedReason: '', comment: '', image: null, preview: null });
   const [submittingReturn, setSubmittingReturn] = useState(false);
+  const [filterStatus, setFilterStatus] = useState('All');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [dateFilter, setDateFilter] = useState('All');
+  const [trackingModal, setTrackingModal] = useState({ open: false, order: null });
+  const [activeTrackingOrder, setActiveTrackingOrder] = useState(null);
+
+  const getDistance = (lat1, lon1, lat2, lon2) => {
+    if (!lat1 || !lon1 || !lat2 || !lon2) return 0;
+    const R = 6371; // Radius of the earth in km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+      Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c; // Distance in km
+  };
+
+  const getUpdatedTimeStr = (updatedAt) => {
+    if (!updatedAt) return '';
+    const diffMs = new Date() - new Date(updatedAt);
+    const diffMins = Math.floor(diffMs / 60000);
+    if (diffMins < 1) return 'just now';
+    if (diffMins === 1) return '1 min ago';
+    if (diffMins < 60) return `${diffMins} mins ago`;
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours === 1) return '1 hour ago';
+    return `${diffHours} hours ago`;
+  };
+
+  useEffect(() => {
+    if (!trackingModal.open || !trackingModal.order?._id) {
+      setActiveTrackingOrder(null);
+      return;
+    }
+
+    setActiveTrackingOrder(trackingModal.order);
+
+    const fetchLatestTracking = async () => {
+      try {
+        const selectedCity = localStorage.getItem('selectedCity');
+        const savedTenantId = localStorage.getItem('zudo_tenant_id');
+        const locationHeader = savedTenantId || selectedCity || '';
+
+        const response = await fetch(`${apiBase}/api/orders/${trackingModal.order._id}`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'x-location': locationHeader,
+            'x-tenant-id': locationHeader
+          }
+        });
+        const data = await response.json();
+        if (response.ok) {
+          setActiveTrackingOrder(data);
+        }
+      } catch (err) {
+        console.error('Failed to fetch tracking details:', err);
+      }
+    };
+
+    fetchLatestTracking();
+    const interval = setInterval(fetchLatestTracking, 5000);
+    return () => clearInterval(interval);
+  }, [trackingModal.open, trackingModal.order?._id]);
 
   const RETURN_REASONS = [
     "Damaged product",
@@ -110,7 +176,7 @@ export default function OrdersPage({ onNavigate }) {
           body: formData
         });
         const uploadData = await uploadRes.json();
-        if (uploadRes.ok) imageUrl = `${IMAGE_BASE_URL}${uploadData.url}`;
+        if (uploadRes.ok) imageUrl = cleanImageUrl(`${IMAGE_BASE_URL}${uploadData.url}`);
       }
 
       // 2. Update Order Status to Returned with separate reason, comment and image
@@ -158,33 +224,65 @@ export default function OrdersPage({ onNavigate }) {
   };
 
   const getStatusStyle = (status) => {
-    switch (status) {
-      case 'Delivered': return 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20';
-      case 'Returned': return 'bg-purple-500 text-white shadow-lg shadow-purple-500/20';
-      case 'Shipped': return 'bg-blue-500 text-white shadow-lg shadow-blue-500/20';
-      case 'Processing': return 'bg-amber-500 text-white shadow-lg shadow-amber-500/20';
-      case 'Pending': return 'bg-gray-500 text-white shadow-lg shadow-gray-500/20';
-      case 'Cancelled': return 'bg-red-500 text-white shadow-lg shadow-red-500/20';
+    const s = status?.toLowerCase();
+    switch (s) {
+      case 'delivered': return 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20';
+      case 'returned': return 'bg-purple-500 text-white shadow-lg shadow-purple-500/20';
+      case 'shipped': return 'bg-blue-500 text-white shadow-lg shadow-blue-500/20';
+      case 'out for delivery': return 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/20';
+      case 'processing': return 'bg-amber-500 text-white shadow-lg shadow-amber-500/20';
+      case 'pending': return 'bg-gray-500 text-white shadow-lg shadow-gray-500/20';
+      case 'cancelled': return 'bg-red-500 text-white shadow-lg shadow-red-500/20';
       default: return 'bg-gray-400 text-white shadow-lg shadow-gray-400/20';
     }
   };
 
   const getStatusIcon = (status) => {
-    switch (status) {
-      case 'Delivered': return <CheckCircle2 size={14} />;
-      case 'Returned': return <ArrowLeft size={14} />;
-      case 'Shipped': return <Truck size={14} />;
-      case 'Processing': return <Clock size={14} />;
-      case 'Cancelled': return <X size={14} />;
+    const s = status?.toLowerCase();
+    switch (s) {
+      case 'delivered': return <CheckCircle2 size={14} />;
+      case 'returned': return <ArrowLeft size={14} />;
+      case 'shipped': return <Truck size={14} />;
+      case 'out for delivery': return <Truck size={14} className="animate-pulse" />;
+      case 'processing': return <Clock size={14} />;
+      case 'cancelled': return <X size={14} />;
       default: return <Package size={14} />;
     }
   };
 
   const formatImageUrl = (url) => {
-    if (!url) return 'https://via.placeholder.com/150';
-    if (url.startsWith('http')) return url;
-    return `${IMAGE_BASE_URL}${url.startsWith('/') ? '' : '/'}${url}`;
+    return cleanImageUrl(url) || 'https://via.placeholder.com/150';
   };
+
+  const filteredOrders = orders.filter(order => {
+    // 1. Status Filter
+    if (filterStatus !== 'All' && order.orderStatus !== filterStatus) return false;
+
+    // 2. Search Filter (ID or Product Name)
+    if (searchTerm) {
+      const searchLower = searchTerm.toLowerCase();
+      const matchesId = order._id.toLowerCase().includes(searchLower);
+      const matchesProduct = order.items.some(item => 
+        (item.name || item.product?.name || '').toLowerCase().includes(searchLower)
+      );
+      if (!matchesId && !matchesProduct) return false;
+    }
+
+    // 3. Date Filter
+    if (dateFilter !== 'All') {
+      const orderDate = new Date(order.createdAt);
+      const now = new Date();
+      if (dateFilter === 'Last 7 Days') {
+        const sevenDaysAgo = new Date(now.setDate(now.getDate() - 7));
+        if (orderDate < sevenDaysAgo) return false;
+      } else if (dateFilter === 'Last 30 Days') {
+        const thirtyDaysAgo = new Date(now.setDate(now.getDate() - 30));
+        if (orderDate < thirtyDaysAgo) return false;
+      }
+    }
+
+    return true;
+  });
 
   if (loading) {
     return (
@@ -231,7 +329,54 @@ export default function OrdersPage({ onNavigate }) {
       </div>
 
       <div className="max-w-5xl mx-auto px-6 -mt-10 relative z-20">
-        {orders.length === 0 ? (
+        {/* Filter Bar */}
+        <div className="bg-white rounded-3xl p-4 shadow-xl shadow-emerald-900/5 border border-gray-100 mb-8 flex flex-col md:flex-row gap-4 items-center">
+          <div className="relative flex-1 w-full">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+            <input 
+              type="text" 
+              placeholder="Search Order ID or Product..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:border-emerald-500 transition-all outline-none text-sm font-bold"
+            />
+          </div>
+          
+          <div className="flex gap-3 w-full md:w-auto overflow-x-auto pb-2 md:pb-0 scrollbar-hide">
+            <div className="relative min-w-[140px]">
+              <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-600" size={14} />
+              <select 
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="w-full pl-9 pr-4 py-3 bg-emerald-50 border border-emerald-100 rounded-2xl text-[10px] font-black uppercase tracking-widest text-emerald-700 outline-none appearance-none cursor-pointer"
+              >
+                <option value="All">All Status</option>
+                <option value="Pending">Pending</option>
+                <option value="Processing">Processing</option>
+                <option value="Shipped">Shipped</option>
+                <option value="Out for Delivery">Out for Delivery</option>
+                <option value="Delivered">Delivered</option>
+                <option value="Cancelled">Cancelled</option>
+                <option value="Returned">Returned</option>
+              </select>
+            </div>
+
+            <div className="relative min-w-[140px]">
+              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-600" size={14} />
+              <select 
+                value={dateFilter}
+                onChange={(e) => setDateFilter(e.target.value)}
+                className="w-full pl-9 pr-4 py-3 bg-emerald-50 border border-emerald-100 rounded-2xl text-[10px] font-black uppercase tracking-widest text-emerald-700 outline-none appearance-none cursor-pointer"
+              >
+                <option value="All">All Time</option>
+                <option value="Last 7 Days">Last 7 Days</option>
+                <option value="Last 30 Days">Last 30 Days</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {filteredOrders.length === 0 ? (
           <div className="bg-white rounded-[2.5rem] p-20 text-center shadow-2xl shadow-emerald-900/5 border border-gray-100 animate-[fadeIn_0.5s_ease-out]">
             <div className="w-32 h-32 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-8">
               <ShoppingBag size={56} className="text-emerald-200" />
@@ -247,92 +392,97 @@ export default function OrdersPage({ onNavigate }) {
           </div>
         ) : (
           <div className="space-y-6">
-            {orders.map((order, orderIdx) => (
+            {filteredOrders.map((order, orderIdx) => (
               <div 
                 key={order._id} 
-                className="bg-white rounded-[2rem] overflow-hidden shadow-xl shadow-emerald-900/5 border border-gray-100 hover:border-emerald-500/30 transition-all duration-300 group"
+                className="bg-white rounded-[2.5rem] overflow-hidden shadow-2xl shadow-emerald-900/5 border border-gray-100 hover:border-emerald-500/20 transition-all duration-500 group relative"
                 style={{ animationDelay: `${orderIdx * 0.1}s` }}
               >
-                <div className="p-6 md:p-8">
-                  <div className="flex flex-col md:flex-row gap-6 justify-between">
-                    <div className="flex gap-6">
-                      <div className="w-20 h-20 bg-emerald-50 rounded-3xl flex-shrink-0 flex items-center justify-center border border-emerald-100 group-hover:scale-105 transition-transform duration-500 overflow-hidden">
-                        {order.items && order.items.length > 0 ? (
-                          <img 
-                            src={formatImageUrl(order.items[0].image || order.items[0].product?.image)} 
-                            alt={order.items[0].name} 
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <Package className="text-emerald-600" size={32} />
+                {/* Visual Accent */}
+                <div className={`absolute top-0 left-0 w-1.5 h-full ${getStatusStyle(order.orderStatus).split(' ')[0]}`}></div>
+                
+                <div className="p-5 sm:p-8">
+                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+                    {/* Left: Product & Basic Info */}
+                    <div className="flex items-start gap-5">
+                      <div className="relative group/img flex-shrink-0">
+                        <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gray-50 rounded-2xl overflow-hidden border border-gray-100 flex items-center justify-center">
+                          {order.items && order.items.length > 0 ? (
+                            <img 
+                              src={formatImageUrl(order.items[0].image || order.items[0].product?.image)} 
+                              alt={order.items[0].name} 
+                              className="w-full h-full object-cover transition-transform duration-700 group-hover/img:scale-110"
+                            />
+                          ) : (
+                            <Package className="text-emerald-600" size={32} />
+                          )}
+                        </div>
+                        {order.items.length > 1 && (
+                          <div className="absolute -bottom-2 -right-2 w-8 h-8 bg-white rounded-full border border-gray-100 shadow-lg flex items-center justify-center text-[10px] font-black text-gray-900">
+                            +{order.items.length - 1}
+                          </div>
                         )}
                       </div>
-                      <div className="space-y-2">
-                        <div className="flex items-center flex-wrap gap-3">
-                          <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] bg-gray-50 px-3 py-1 rounded-full border border-gray-100">
+
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100 uppercase tracking-widest">
                             ID: #{order._id.slice(-6).toUpperCase()}
                           </span>
-                          <span className="text-[10px] font-black text-emerald-600 uppercase tracking-[0.2em] bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">
-                            Seller: {order.items[0]?.sellerName || order.items[0]?.product?.sellerName || order.items[0]?.product?.sellerId?.businessName || order.items[0]?.product?.sellerId?.name || 'Zudo Official'}
-                          </span>
-                          <div className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-[10px] font-black tracking-widest uppercase transition-all ${getStatusStyle(order.orderStatus)}`}>
+                          <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[9px] font-black tracking-widest uppercase transition-all shadow-sm ${getStatusStyle(order.orderStatus)}`}>
                             {getStatusIcon(order.orderStatus)}
                             {order.orderStatus}
                           </div>
-                          <div className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-[10px] font-black tracking-widest uppercase transition-all ${
-                            order.paymentStatus === 'Paid' ? 'bg-emerald-500 text-white' : 
-                            order.paymentStatus === 'Failed' ? 'bg-red-500 text-white' :
-                            'bg-amber-500 text-white'
-                          }`}>
-                            <Receipt size={12} />
-                            {order.paymentStatus || 'Pending'}
-                          </div>
                           {order.deliveryOtp && order.orderStatus !== 'Delivered' && order.orderStatus !== 'Cancelled' && (
-                            <div className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-1.5 rounded-full text-[10px] font-black tracking-widest uppercase shadow-lg shadow-emerald-600/20">
-                              <Truck size={12} />
-                              Delivery OTP: <span className="font-mono text-xs tracking-[0.2em] ml-1">{order.deliveryOtp}</span>
+                            <div className="flex items-center gap-2 bg-gray-900 text-white px-2.5 py-1 rounded-md text-[9px] font-black tracking-widest uppercase shadow-lg shadow-gray-900/10">
+                              <Truck size={10} className="text-emerald-400" />
+                              OTP: <span className="font-mono text-xs text-emerald-400 tracking-wider ml-0.5">{order.deliveryOtp}</span>
                             </div>
                           )}
                         </div>
-                        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-gray-500 font-bold text-sm">
-                          <div className="flex items-center gap-2 text-gray-900">
-                            <Calendar size={16} className="text-emerald-600" />
-                            {new Date(order.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-                          </div>
-                          <div className="flex items-center gap-2 text-gray-900">
-                            <Receipt size={16} className="text-emerald-600" />
-                            <span className="text-lg font-black tracking-tighter">₹{order.totalAmount}</span>
-                          </div>
+                        <h3 className="text-base sm:text-lg font-black text-gray-900 tracking-tight leading-tight">
+                          {order.items[0]?.name || order.items[0]?.product?.name || 'Order Details'}
+                          {order.items.length > 1 && <span className="text-gray-400 font-bold ml-2 text-sm">& {order.items.length - 1} more</span>}
+                        </h3>
+                        <div className="flex items-center gap-4 text-gray-500 font-bold text-xs uppercase tracking-tight">
+                          <span className="flex items-center gap-1.5"><Calendar size={12} className="text-emerald-500" /> {new Date(order.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span>
+                          <span className="flex items-center gap-1.5"><ShoppingBag size={12} className="text-emerald-500" /> {order.items.length} Items</span>
                         </div>
                       </div>
                     </div>
 
-                    <div className="flex flex-row md:flex-col items-center md:items-end justify-between md:justify-center gap-4 border-t md:border-t-0 border-gray-50 pt-4 md:pt-0">
-                      <div className="flex -space-x-4">
-                        {order.items.slice(0, 3).map((item, idx) => (
-                          <div key={idx} className="w-12 h-12 rounded-2xl border-4 border-white bg-white overflow-hidden shadow-md transform hover:-translate-y-2 hover:z-10 transition-all cursor-pointer">
-                            <img 
-                              src={formatImageUrl(item.product?.imageUrl || item.product?.image || item.image || item.imageUrl)} 
-                              alt="Item" 
-                              className="w-full h-full object-cover" 
-                            />
-                          </div>
-                        ))}
-                        {order.items.length > 3 && (
-                          <div className="w-12 h-12 rounded-2xl border-4 border-white bg-[#107569] flex items-center justify-center text-xs font-black text-white shadow-md">
-                            +{order.items.length - 3}
-                          </div>
-                        )}
+                    {/* Middle/Right: Price & Status */}
+                    <div className="flex items-center lg:items-end justify-between lg:flex-col gap-2 pt-4 lg:pt-0 border-t lg:border-t-0 border-gray-50">
+                      <div className="text-left lg:text-right">
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Total Amount</p>
+                        <p className="text-2xl font-black text-gray-900 tracking-tighter leading-none">₹{order.totalAmount}</p>
                       </div>
-                      <button 
-                        onClick={() => toggleOrderExpansion(order._id)}
-                        className="flex items-center gap-2 px-6 py-2.5 bg-emerald-50 text-emerald-700 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-600 hover:text-white transition-all shadow-sm"
-                      >
-
-                        {expandedOrder === order._id ? 'Hide Details' : 'View Details'}
-                        {expandedOrder === order._id ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                      </button>
-
+                      
+                      <div className="flex items-center gap-2">
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); generateInvoice(order); }}
+                          className="p-2.5 bg-gray-50 text-gray-400 hover:bg-emerald-50 hover:text-emerald-600 rounded-xl transition-all border border-gray-100"
+                          title="Download Invoice"
+                        >
+                          <Receipt size={16} />
+                        </button>
+                        {order.orderStatus?.toLowerCase() === 'out for delivery' && (
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); setTrackingModal({ open: true, order }); }}
+                            className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-600/20 active:scale-95 animate-pulse"
+                          >
+                            <NavIcon size={14} />
+                            Track Live
+                          </button>
+                        )}
+                        <button 
+                          onClick={() => toggleOrderExpansion(order._id)}
+                          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${expandedOrder === order._id ? 'bg-emerald-600 text-white shadow-xl shadow-emerald-600/30' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'}`}
+                        >
+                          {expandedOrder === order._id ? 'Hide Details' : 'View Details'}
+                          {expandedOrder === order._id ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -423,27 +573,27 @@ export default function OrdersPage({ onNavigate }) {
                           </div>
                         </div>
 
-                        {/* Cash Collector Info */}
-                        {order.cashPersonId && typeof order.cashPersonId === 'object' && (
+                        {/* Delivery Partner Info */}
+                        {(order.driverId || order.cashPersonId) && (
                           <div className="space-y-4">
                             <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
                               <User size={14} className="text-emerald-500" />
-                              Cash Collector Details
+                              Delivery Partner Details
                             </h3>
                             <div className="bg-white p-5 rounded-3xl border border-emerald-100 shadow-sm">
                               <div className="flex items-center gap-4">
                                 <div className="w-12 h-12 bg-emerald-100 rounded-2xl flex items-center justify-center text-emerald-700 font-black">
-                                  {order.cashPersonId.name?.charAt(0) || 'C'}
+                                  {(order.driverId?.name || order.cashPersonId?.name)?.charAt(0) || 'D'}
                                 </div>
                                 <div>
-                                  <p className="font-black text-gray-900 mb-0.5">{order.cashPersonId.name}</p>
+                                  <p className="font-black text-gray-900 mb-0.5">{order.driverId?.name || order.cashPersonId?.name}</p>
                                   <p className="text-emerald-600 text-sm font-black flex items-center gap-2">
                                     <Phone size={12} />
-                                    {order.cashPersonId.phone}
+                                    {order.driverId?.phone || order.cashPersonId?.phone}
                                   </p>
-                                  {order.cashPersonId.email && (
+                                  {(order.driverId?.email || order.cashPersonId?.email) && (
                                     <p className="text-gray-400 text-[10px] font-bold mt-1 uppercase tracking-widest">
-                                      {order.cashPersonId.email}
+                                      {order.driverId?.email || order.cashPersonId?.email}
                                     </p>
                                   )}
                                 </div>
@@ -467,13 +617,27 @@ export default function OrdersPage({ onNavigate }) {
                                 </div>
                                 <div>
                                   <p className="font-black text-gray-900 text-sm leading-none mb-1">{item.product?.name || item.name || 'Unknown Product'}</p>
-                                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{item.quantity} × ₹{item.price}</p>
+                                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest font-mono">
+                                    {item.quantity} × ₹{item.price}
+                                    {item.normalPrice !== undefined && (
+                                      <span className="text-amber-600 ml-2 font-bold normal-case">
+                                        (Normal: ₹{item.normalPrice})
+                                      </span>
+                                    )}
+                                  </p>
                                   <p className="text-[10px] font-bold text-emerald-600 mt-1 uppercase tracking-tight">
-                                    Sold by: {item.sellerName || item.product?.sellerName || item.product?.sellerId?.businessName || item.product?.sellerId?.name || 'Zudo Official'}
+                                    Sold by: {item.sellerName || item.product?.sellerName || item.productId?.sellerName || item.productId?.sellerId?.businessName || item.productId?.sellerId?.name || 'Zudo Official'}
                                   </p>
                                 </div>
                               </div>
-                              <div className="text-sm font-black text-gray-900">₹{item.quantity * item.price}</div>
+                              <div className="text-right">
+                                <div className="text-sm font-black text-gray-900">₹{item.quantity * item.price}</div>
+                                {item.normalPrice !== undefined && (
+                                  <div className="text-[10px] font-bold text-amber-600 mt-0.5">
+                                    Normal: ₹{item.quantity * item.normalPrice}
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           ))}
                         </div>
@@ -590,6 +754,183 @@ export default function OrdersPage({ onNavigate }) {
           </div>
         </div>
       )}
+      {/* Live Tracking Modal */}
+      {trackingModal.open && trackingModal.order && (() => {
+        const currentTrackingOrder = activeTrackingOrder || trackingModal.order;
+        const driverLat = currentTrackingOrder.driverId?.currentLocation?.lat;
+        const driverLng = currentTrackingOrder.driverId?.currentLocation?.lng;
+        const destLat = currentTrackingOrder.shippingAddress?.lat;
+        const destLng = currentTrackingOrder.shippingAddress?.lng;
+
+        let distanceStr = '1.2 KM';
+        let timeStr = '8-12 MINS';
+
+        if (driverLat && driverLng && destLat && destLng) {
+          const d = getDistance(driverLat, driverLng, destLat, destLng);
+          distanceStr = `${d.toFixed(1)} KM`;
+          const mins = Math.max(2, Math.round((d / 30) * 60));
+          timeStr = mins <= 3 ? '2-3 MINS' : `${mins - 2}-${mins + 2} MINS`;
+        }
+
+        const mapUrl = (driverLat && driverLng && destLat && destLng)
+          ? `https://maps.google.com/maps?saddr=${driverLat},${driverLng}&daddr=${destLat},${destLng}&t=&z=15&ie=UTF8&iwloc=&output=embed`
+          : (destLat && destLng)
+            ? `https://maps.google.com/maps?q=${destLat},${destLng}&t=&z=15&ie=UTF8&iwloc=&output=embed`
+            : '';
+
+        return (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-0 md:p-6 animate-[fadeIn_0.2s_ease-out]">
+            <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setTrackingModal({ open: false, order: null })}></div>
+            
+            <div className="bg-white w-full max-w-5xl h-full md:h-[85vh] md:rounded-[3rem] shadow-2xl relative z-10 overflow-hidden flex flex-col md:flex-row animate-[scaleIn_0.3s_ease-out]">
+              {/* Left Sidebar - Order & Agent Details */}
+              <div className="w-full md:w-[360px] lg:w-[400px] bg-white border-b md:border-b-0 md:border-r border-gray-100 flex flex-col h-[50vh] md:h-full z-20">
+                {/* Header */}
+                <div className="p-5 border-b border-gray-100 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600 flex-shrink-0">
+                      <Truck size={20} className="animate-pulse" />
+                    </div>
+                    <div>
+                      <h2 className="text-base font-black text-gray-900 tracking-tight">Live Tracking</h2>
+                      <p className="text-[9px] font-black text-indigo-500 uppercase tracking-widest">
+                        Order #{currentTrackingOrder._id.slice(-6).toUpperCase()}
+                      </p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => setTrackingModal({ open: false, order: null })}
+                    className="md:hidden p-2 bg-gray-50 text-gray-400 hover:text-red-500 rounded-xl transition-all"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+
+                {/* Content */}
+                <div className="flex-1 overflow-y-auto p-5 space-y-6 scrollbar-hide">
+                  {/* Agent Card */}
+                  <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 space-y-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 bg-indigo-100 text-indigo-700 rounded-2xl flex items-center justify-center font-black text-lg shadow-inner flex-shrink-0">
+                        {(currentTrackingOrder.driverId?.name || currentTrackingOrder.cashPersonId?.name)?.charAt(0) || 'D'}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Delivery Partner</p>
+                        <p className="font-black text-sm text-gray-900 truncate">{currentTrackingOrder.driverId?.name || currentTrackingOrder.cashPersonId?.name || 'Zudo Partner'}</p>
+                        <p className="text-[10px] text-gray-500 font-bold mt-0.5 truncate">
+                          {currentTrackingOrder.driverId?.vehicleDetails || currentTrackingOrder.driverId?.type || 'Standard Delivery Vehicle'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Distance & Time Metrics */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-indigo-50/50 border border-indigo-100/50 p-4 rounded-2xl">
+                      <p className="text-[9px] font-black text-indigo-600 uppercase tracking-widest mb-1">Est. Arrival</p>
+                      <p className="text-base font-black text-gray-900 leading-none">{timeStr}</p>
+                    </div>
+                    <div className="bg-emerald-50/50 border border-emerald-100/50 p-4 rounded-2xl">
+                      <p className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-1">Distance</p>
+                      <p className="text-base font-black text-gray-900 leading-none">{distanceStr}</p>
+                    </div>
+                  </div>
+
+                  {/* Address Summary */}
+                  <div className="space-y-2">
+                    <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Delivery Destination</p>
+                    <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 text-[11px] leading-relaxed">
+                      <p className="font-black text-gray-900 mb-0.5">{currentTrackingOrder.shippingAddress?.name}</p>
+                      <p className="text-gray-500 font-bold">{currentTrackingOrder.shippingAddress?.address}</p>
+                    </div>
+                  </div>
+
+                  {/* Status Indicator */}
+                  <div className="flex items-center gap-2 text-[9px] font-black text-indigo-600 bg-indigo-50 px-3 py-2.5 rounded-xl border border-indigo-100 flex-wrap">
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-600"></span>
+                    </span>
+                    <span className="uppercase tracking-widest">Live location active</span>
+                    {currentTrackingOrder.driverId?.currentLocation?.updatedAt && (
+                      <span className="text-gray-400 lowercase font-bold ml-auto">
+                        updated {getUpdatedTimeStr(currentTrackingOrder.driverId.currentLocation.updatedAt)}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Actions Sidebar Footer */}
+                <div className="p-4 border-t border-gray-100 bg-slate-50/50 space-y-2">
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => window.open(`tel:${currentTrackingOrder.driverId?.phone || currentTrackingOrder.cashPersonId?.phone || '0000000000'}`, '_self')}
+                      className="flex-1 py-3 bg-white text-gray-900 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-sm border border-gray-200 flex items-center justify-center gap-2 hover:bg-gray-100 transition-all"
+                    >
+                      <Phone size={12} className="text-indigo-600" />
+                      Call Agent
+                    </button>
+                    <button 
+                      onClick={() => {
+                        const dest = (destLat && destLng) ? `${destLat},${destLng}` : '';
+                        const orig = (driverLat && driverLng) ? `${driverLat},${driverLng}` : '';
+                        const url = orig 
+                          ? `https://www.google.com/maps/dir/?api=1&origin=${orig}&destination=${dest}`
+                          : `https://www.google.com/maps/dir/?api=1&destination=${dest}`;
+                        window.open(url, '_blank');
+                      }}
+                      className="flex-1 py-3 bg-indigo-50 text-indigo-700 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-100 transition-all flex items-center justify-center gap-2"
+                    >
+                      <MapPin size={12} />
+                      Directions
+                    </button>
+                  </div>
+                  <button 
+                    onClick={() => setTrackingModal({ open: false, order: null })}
+                    className="w-full py-3 bg-indigo-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-md hover:bg-indigo-700 transition-all"
+                  >
+                    Close Tracker
+                  </button>
+                </div>
+              </div>
+
+              {/* Right Side - Fullscreen Map */}
+              <div className="flex-1 relative bg-slate-100 h-[50vh] md:h-full">
+                {mapUrl ? (
+                  <iframe 
+                    width="100%" 
+                    height="100%" 
+                    frameBorder="0" 
+                    scrolling="no" 
+                    marginHeight="0" 
+                    marginWidth="0" 
+                    src={mapUrl}
+                    className="absolute inset-0 grayscale-[0.2] contrast-[1.1]"
+                  ></iframe>
+                ) : (
+                  <div className="absolute inset-0 bg-[url('https://www.google.com/maps/vt/pb=!1m4!1m3!1i14!2i11721!3i7526!2m3!1e0!2sm!3i615286060!3m8!2sen!3spr!4v170955!5m2!1sen!3spr!8m2!1d18.2208!2d-66.5901!4m1!1i14!10b1!12b1!13b1!16b1!17m1!1e1!20m1!1e1!21m1!1e1!22m1!1e1!30m1!1e1!31m1!1e1!34m1!1e1!39b1!44m1!1e1!50m1!1e1!67m1!1e1!73m1!1e1!114m1!1e1!115m1!1e1!130m1!1e1')] bg-cover opacity-60"></div>
+                )}
+                
+                <div className="absolute inset-0 pointer-events-none bg-indigo-900/5 backdrop-grayscale-[0.1]"></div>
+
+                {/* Destination Pin Overlay (Visual Only) */}
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none">
+                  <div className="w-12 h-12 bg-emerald-500/20 rounded-full animate-ping"></div>
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-6 h-6 bg-emerald-600 rounded-full border-4 border-white shadow-2xl"></div>
+                </div>
+
+                {/* Floating Close Button for Desktop Map */}
+                <button 
+                  onClick={() => setTrackingModal({ open: false, order: null })}
+                  className="hidden md:flex absolute top-6 right-6 p-3 bg-white text-gray-500 hover:text-red-500 rounded-2xl shadow-xl border border-gray-100 hover:scale-105 transition-all z-30"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

@@ -23,7 +23,9 @@ app.use('/uploads', express.static(uploadDir));
 const SUPPORTED_LOCATIONS = {
   'bangalore': 'zudo-bengaluru',
   'bengaluru': 'zudo-bengaluru',
-  'mysore': 'zudo-mysore'
+  'mysore': 'zudo-mysore',
+  'kozhikode': 'zudo-kozhikode',
+  'coimbatore': 'zudo-coimbatore'
 };
 
 // Import all models to get their schemas
@@ -37,6 +39,9 @@ const Driver = require('./models/Driver');
 const CashCollector = require('./models/CashCollector');
 const Admin = require('./models/Admin');
 const Seller = require('./models/Seller');
+const PopupAd = require('./models/PopupAd');
+const FeedPost = require('./models/FeedPost');
+const Sales = require('./models/Sales');
 
 const storage = require('./utils/context');
 
@@ -48,7 +53,7 @@ const refreshAllowedDatabases = async () => {
     const locations = await centralDb.collection('locations').find({}).toArray();
     
     // STRICT NORMALIZATION: Lowercase all dbNames for comparison
-    const dbNames = locations.map(loc => loc.dbName?.trim().toLowerCase()).filter(Boolean);
+    const dbNames = locations.map(loc => (loc.dbName || loc.name)?.trim().toLowerCase()).filter(Boolean);
     ALLOWED_DATABASES = new Set(['zudodb', 'zudo-central', ...dbNames]);
     
     console.log('[INFO] Allowed Databases refreshed (normalized):', Array.from(ALLOWED_DATABASES));
@@ -120,7 +125,10 @@ const setDynamicDB = (req, res, next) => {
       { name: 'Driver', model: Driver },
       { name: 'CashCollector', model: CashCollector },
       { name: 'Admin', model: Admin },
-      { name: 'Seller', model: Seller }
+      { name: 'Seller', model: Seller },
+      { name: 'PopupAd', model: PopupAd },
+      { name: 'FeedPost', model: FeedPost },
+      { name: 'Sales', model: Sales }
     ];
 
     modelsToRegister.forEach(m => {
@@ -174,6 +182,9 @@ mongoose.connect(process.env.MONGODB_URI)
     app.use('/api/reviews', require('./routes/reviews'));
     app.use('/api/cashcollectors', require('./routes/cashCollectors'));
     app.use('/api/contact', require('./routes/contact'));
+    app.use('/api/ads', require('./routes/ads'));
+    app.use('/api/feedposts', require('./routes/feedposts'));
+    app.use('/api/sales', require('./routes/sales'));
 
     // Base route
     app.get('/', (req, res) => {

@@ -1,8 +1,42 @@
 const express = require('express');
 const router = express.Router();
 const Order = require('../models/Order');
+const Driver = require('../models/Driver');
+const CashCollector = require('../models/CashCollector');
 const { protect } = require('../middleware/auth');
 const sendEmail = require('../utils/email');
+const mongoose = require('mongoose');
+
+// Helper to find commission for product
+const findCommissionForProduct = (product, commissions) => {
+  const pCatId = product.categoryId?._id?.toString() || product.categoryId?.toString();
+  if (!pCatId) return null;
+  
+  const catCommissions = commissions.filter(c => c.categoryId?.toString() === pCatId);
+  if (catCommissions.length === 0) return null;
+  
+  if (product.unit) {
+    const unitMatch = catCommissions.find(c => c.unit && c.unit.trim().toLowerCase() === product.unit.trim().toLowerCase());
+    if (unitMatch) return unitMatch;
+  }
+  
+  const fallbackMatch = catCommissions.find(c => !c.unit);
+  if (fallbackMatch) return fallbackMatch;
+  
+  return catCommissions[0] || null;
+};
+
+// Helper to calculate commissioned price
+const getCommissionedPrice = (productPrice, commission) => {
+  if (!commission) return productPrice;
+  let value = Number(commission.commissionValue) || 0;
+  if (commission.commissionType === 'flat') {
+    return productPrice + value;
+  } else if (commission.commissionType === 'percentage') {
+    return productPrice + Math.round(productPrice * value / 100);
+  }
+  return productPrice;
+};
 
 // @route   POST /api/orders
 // @desc    Create a new order
@@ -15,31 +49,53 @@ router.post('/', protect, async (req, res) => {
       return res.status(400).json({ message: 'No order items' });
     }
 
+    // Enforce Minimum Order Value for B2B/Business/Seller roles
+    const isB2BUser = ['b2b', 'business', 'seller'].includes(req.user.role);
+    if (isB2BUser && totalAmount < 2000) {
+      return res.status(400).json({ message: 'Minimum order value for B2B/Business account is ₹2000' });
+    }
+
     const Product = require('../models/Product');
+    const Commission = require('../models/Commission');
+    const commissions = await Commission.find();
+
     const enrichedItems = await Promise.all(items.map(async (item) => {
       const pId = item.product || item.id || item._id;
       let name = item.name;
       let image = item.image || item.imageUrl;
+      let sellerName = item.sellerName;
+      let normalPrice = item.price; // fallback
+      let finalPrice = item.price; // fallback
 
       // If name or image is missing, fetch from database
-      if (!name || !image) {
-        const productData = await Product.findById(pId);
-        if (productData) {
-          name = name || productData.name;
-          image = image || productData.imageUrl || productData.image;
-        }
+      const productData = await Product.findById(pId).populate('sellerId');
+      if (productData) {
+        name = name || productData.name;
+        image = image || productData.imageUrl || productData.image;
+        sellerName = sellerName || productData.sellerName || productData.sellerId?.businessName || productData.sellerId?.name || 'Zudo Official';
+        
+        // Base normal price is always the B2B price (or retail price if B2B price is not set)
+        const basePrice = productData.b2bPrice || productData.price;
+        normalPrice = basePrice;
+
+        // Apply commission to get commissioned price
+        const comm = findCommissionForProduct(productData, commissions);
+        finalPrice = getCommissionedPrice(basePrice, comm);
       }
 
       return {
         productId: pId,
         name: name || 'Unknown Product',
         quantity: item.quantity,
-        price: item.price,
+        price: finalPrice,
+        normalPrice: normalPrice,
         image: image,
+        sellerName: sellerName || 'Zudo Official',
         product: {
           name: name || 'Unknown Product',
           image: image,
-          imageUrl: image
+          imageUrl: image,
+          sellerName: sellerName || 'Zudo Official'
         }
       };
     }));
@@ -71,12 +127,54 @@ router.post('/', protect, async (req, res) => {
 router.get('/myorders', protect, async (req, res) => {
   try {
     const orders = await Order.find({ userId: req.user._id })
+      .populate('userId', 'name email role businessName gstNumber')
       .populate('cashPersonId')
+      .populate('driverId')
+      .populate({
+        path: 'items.productId',
+        populate: {
+          path: 'sellerId',
+          select: 'name businessName'
+        }
+      })
       .sort({ createdAt: -1 });
     res.json(orders);
   } catch (error) {
 
     console.error('Fetch orders error:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// @route   GET /api/orders/:id
+// @desc    Get order by ID with populated driver
+// @access  Private
+router.get('/:id', protect, async (req, res) => {
+  try {
+    const order = await Order.findById(req.params.id)
+      .populate('userId', 'name email role businessName gstNumber')
+      .populate('cashPersonId')
+      .populate('driverId')
+      .populate({
+        path: 'items.productId',
+        populate: {
+          path: 'sellerId',
+          select: 'name businessName'
+        }
+      });
+
+    if (!order) {
+      return res.status(404).json({ message: 'Order not found' });
+    }
+
+    // Authorization check
+    if (order.userId.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Not authorized to view this order' });
+    }
+
+    res.json(order);
+  } catch (error) {
+    console.error('Fetch order by ID error:', error);
     res.status(500).json({ message: error.message });
   }
 });
@@ -88,6 +186,13 @@ router.get('/admin/all', protect, async (req, res) => {
     const orders = await Order.find()
       .populate('userId', 'name email role')
       .populate('cashPersonId')
+      .populate({
+        path: 'items.productId',
+        populate: {
+          path: 'sellerId',
+          select: 'name businessName'
+        }
+      })
       .sort({ createdAt: -1 });
     res.json(orders);
   } catch (error) {

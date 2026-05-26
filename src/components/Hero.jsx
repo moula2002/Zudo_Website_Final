@@ -7,9 +7,14 @@ export default function Hero({ onNavigate }) {
         
         {/* Left Column - Text Content */}
         <div className="w-full lg:w-[50%] z-20 relative">
-          <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm px-3 py-1.5 rounded-full mb-5 border border-white/20 shadow-sm cursor-default">
-            <div className="bg-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] shadow-inner text-black">🌾</div>
-            <span className="text-xs font-semibold text-white tracking-wide">Premium Quality Grains & Pulses</span>
+          <div className="flex flex-wrap gap-3 mb-5">
+            <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm px-3 py-1.5 rounded-full border border-white/20 shadow-sm cursor-default">
+              <div className="bg-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] shadow-inner text-black">🌾</div>
+              <span className="text-xs font-semibold text-white tracking-wide">Premium Quality Grains & Pulses</span>
+            </div>
+            <div className="inline-flex items-center gap-2 bg-amber-400/20 backdrop-blur-sm px-3 py-1.5 rounded-full border border-amber-400/30 shadow-sm cursor-default">
+              <span className="text-[10px] font-black text-amber-200 uppercase tracking-widest animate-pulse">✨ Buy more, enjoy more</span>
+            </div>
           </div>
           
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight mb-4 tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white via-emerald-50 to-teal-200">

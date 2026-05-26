@@ -24,9 +24,14 @@ export default function Footer({ onNavigate }) {
             <div className="mb-6">
               <img src="/logo.png" alt="Zudo Logo" className="h-12 w-auto object-contain drop-shadow-sm" />
             </div>
-            <p className="text-sm leading-relaxed mb-6">
+            <p className="text-sm leading-relaxed mb-4">
               Your trusted partner for premium quality groceries. We deliver the freshest grains, pulses, and daily essentials straight to your doorstep, ensuring health and happiness in every meal.
             </p>
+            <div className="mb-6">
+              <span className="inline-block px-3 py-1 bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-[0.2em] rounded-lg border border-emerald-100 shadow-sm">
+                ✨ Buy more, enjoy more
+              </span>
+            </div>
             <div className="flex gap-4">
               <a href="#" className="w-10 h-10 rounded-full bg-white border border-gray-200 flex items-center justify-center text-gray-500 hover:text-green-600 hover:border-green-600 transition-colors shadow-sm">
                 <FacebookIcon />

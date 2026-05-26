@@ -10,6 +10,7 @@ const userSchema = new mongoose.Schema({
   role: { type: String, enum: ['b2c', 'b2b', 'seller'], default: 'b2c' },
   profilePicture: { type: String },
   // B2B specific fields
+  pincode: { type: String },
   businessName: { type: String },
   businessAddress: { type: String },
   gstNumber: { type: String },
@@ -29,10 +30,12 @@ const userSchema = new mongoose.Schema({
     state: String,
     lat: Number,
     lng: Number,
+    storeName: String,
     isDefault: { type: Boolean, default: false }
   }],
   resetPasswordToken: String,
-  resetPasswordExpires: Date
+  resetPasswordExpires: Date,
+  sessionId: { type: String, default: null }
 }, { timestamps: true });
 
 userSchema.index({ email: 1, role: 1 }, { unique: true });
