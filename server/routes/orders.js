@@ -11,18 +11,18 @@ const mongoose = require('mongoose');
 const findCommissionForProduct = (product, commissions) => {
   const pCatId = product.categoryId?._id?.toString() || product.categoryId?.toString();
   if (!pCatId) return null;
-  
+
   const catCommissions = commissions.filter(c => c.categoryId?.toString() === pCatId);
   if (catCommissions.length === 0) return null;
-  
+
   if (product.unit) {
     const unitMatch = catCommissions.find(c => c.unit && c.unit.trim().toLowerCase() === product.unit.trim().toLowerCase());
     if (unitMatch) return unitMatch;
   }
-  
+
   const fallbackMatch = catCommissions.find(c => !c.unit);
   if (fallbackMatch) return fallbackMatch;
-  
+
   return catCommissions[0] || null;
 };
 
@@ -43,8 +43,8 @@ const getCommissionedPrice = (productPrice, commission) => {
 // @access  Private
 router.post('/', protect, async (req, res) => {
   try {
-    const { items, totalAmount, shippingAddress, paymentMethod } = req.body;
-    
+    const { items, totalAmount, shippingAddress, paymentMethod, deliverySlot } = req.body;
+
     if (!items || items.length === 0) {
       return res.status(400).json({ message: 'No order items' });
     }
@@ -73,7 +73,7 @@ router.post('/', protect, async (req, res) => {
         name = name || productData.name;
         image = image || productData.imageUrl || productData.image;
         sellerName = sellerName || productData.sellerName || productData.sellerId?.businessName || productData.sellerId?.name || 'Zudo Official';
-        
+
         // Base normal price is always the B2B price (or retail price if B2B price is not set)
         const basePrice = productData.b2bPrice || productData.price;
         normalPrice = basePrice;
@@ -110,7 +110,8 @@ router.post('/', protect, async (req, res) => {
       paymentMethod,
       paymentStatus: paymentMethod === 'COD' ? 'Pending' : 'Completed',
       orderStatus: 'Pending',
-      deliveryOtp
+      deliveryOtp,
+      deliverySlot: deliverySlot || null
     });
 
     const createdOrder = await order.save();
@@ -206,7 +207,7 @@ router.get('/admin/all', protect, async (req, res) => {
 router.put('/:id/status', protect, async (req, res) => {
   try {
     const { status } = req.body;
-    
+
     if (!status) {
       return res.status(400).json({ message: 'Status is required' });
     }
@@ -215,21 +216,21 @@ router.put('/:id/status', protect, async (req, res) => {
     if (!order) {
       return res.status(404).json({ message: 'Order not found' });
     }
-    
+
     // Authorization check: User can only cancel their own order
     if (order.userId.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Not authorized to update this order' });
     }
 
     order.orderStatus = status;
-    
+
     // If status is 'Returned', save reason and image
     if (status === 'Returned') {
       order.returnReason = req.body.returnReason || null;
       order.returnComment = req.body.returnComment || null;
       order.returnImage = req.body.returnImage || null;
     }
-    
+
     // If cancelled, also update payment status if it was COD
     if (status === 'Cancelled' && order.paymentMethod === 'COD') {
       order.paymentStatus = 'Cancelled';
@@ -300,8 +301,8 @@ router.put('/:id/status', protect, async (req, res) => {
     res.json(order);
   } catch (error) {
     console.error('Order status update error:', error);
-    res.status(500).json({ 
-      message: 'Failed to update order status', 
+    res.status(500).json({
+      message: 'Failed to update order status',
       error: error.message,
       details: error.errors ? Object.values(error.errors).map(err => err.message) : []
     });
@@ -321,11 +322,11 @@ router.post('/:id/delivery-otp', protect, async (req, res) => {
     // Generate new 4-digit OTP
     const newOtp = Math.floor(1000 + Math.random() * 9000).toString();
     order.deliveryOtp = newOtp;
-    
+
     await order.save();
-    res.json({ 
-      message: 'Delivery OTP updated successfully', 
-      deliveryOtp: newOtp 
+    res.json({
+      message: 'Delivery OTP updated successfully',
+      deliveryOtp: newOtp
     });
   } catch (error) {
     console.error('OTP generation error:', error);

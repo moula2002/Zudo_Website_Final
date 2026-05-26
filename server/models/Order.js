@@ -65,6 +65,10 @@ const orderSchema = new mongoose.Schema({
     type: String,
     default: null
   },
+  deliverySlot: {
+    type: String,
+    default: null
+  },
   cashPersonId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'CashCollector'
@@ -92,7 +96,7 @@ const orderSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
-module.exports = new Proxy(function() {}, {
+module.exports = new Proxy(function () { }, {
   get(target, prop) {
     try {
       const context = storage.getStore();

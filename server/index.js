@@ -42,6 +42,7 @@ const Seller = require('./models/Seller');
 const PopupAd = require('./models/PopupAd');
 const FeedPost = require('./models/FeedPost');
 const Sales = require('./models/Sales');
+const DeliverySlot = require('./models/DeliverySlot');
 
 const storage = require('./utils/context');
 
@@ -51,11 +52,11 @@ const refreshAllowedDatabases = async () => {
   try {
     const centralDb = mongoose.connection.useDb('zudo-central', { useCache: true });
     const locations = await centralDb.collection('locations').find({}).toArray();
-    
+
     // STRICT NORMALIZATION: Lowercase all dbNames for comparison
     const dbNames = locations.map(loc => (loc.dbName || loc.name)?.trim().toLowerCase()).filter(Boolean);
     ALLOWED_DATABASES = new Set(['zudodb', 'zudo-central', ...dbNames]);
-    
+
     console.log('[INFO] Allowed Databases refreshed (normalized):', Array.from(ALLOWED_DATABASES));
   } catch (err) {
     console.error('[WARN] Failed to refresh allowed databases:', err.message);
@@ -65,14 +66,14 @@ const refreshAllowedDatabases = async () => {
 // Middleware to check location availability and set dynamic DB context
 const setDynamicDB = (req, res, next) => {
   try {
-    const tenantId = req.headers['x-tenant-id'] || req.headers['x-location']; 
-    
+    const tenantId = req.headers['x-tenant-id'] || req.headers['x-location'];
+
     // Determine target database name
     let dbName = 'zudodb';
-    
+
     if (tenantId) {
       let sanitizedId = tenantId.trim().toLowerCase();
-      
+
       // Clean up double prefixes if they exist (e.g., "zudo-zudo-bengaluru" -> "zudo-bengaluru")
       while (sanitizedId.startsWith('zudo-zudo-')) {
         sanitizedId = sanitizedId.replace('zudo-zudo-', 'zudo-');
@@ -110,10 +111,10 @@ const setDynamicDB = (req, res, next) => {
     }
 
     console.log(`[DEBUG] Tenant ID: ${tenantId} -> Database: ${dbName}`);
-    
+
     // Create or get the tenant-specific connection
     const db = mongoose.connection.useDb(dbName, { useCache: true });
-    
+
     // Register all models on this connection immediately if not already registered
     const modelsToRegister = [
       { name: 'User', model: User },
@@ -128,7 +129,8 @@ const setDynamicDB = (req, res, next) => {
       { name: 'Seller', model: Seller },
       { name: 'PopupAd', model: PopupAd },
       { name: 'FeedPost', model: FeedPost },
-      { name: 'Sales', model: Sales }
+      { name: 'Sales', model: Sales },
+      { name: 'DeliverySlot', model: DeliverySlot }
     ];
 
     modelsToRegister.forEach(m => {
@@ -140,17 +142,17 @@ const setDynamicDB = (req, res, next) => {
         }
       }
     });
-    
+
     // Run the rest of the request in this context
     storage.run({ db }, () => {
       next();
     });
   } catch (error) {
     console.error('[CRITICAL] setDynamicDB Middleware Error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Internal Database Error', 
-      error: error.message 
+    res.status(500).json({
+      success: false,
+      message: 'Internal Database Error',
+      error: error.message
     });
   }
 };
@@ -164,13 +166,13 @@ app.use(setDynamicDB);
 mongoose.connect(process.env.MONGODB_URI)
   .then(async () => {
     console.log('Connected to MongoDB (Main)');
-    
+
     // Refresh allowed databases cache
     await refreshAllowedDatabases();
-    
+
     // Periodically refresh cache (every 5 mins)
     setInterval(refreshAllowedDatabases, 5 * 60 * 1000);
-    
+
     // Routes
     app.use('/api/auth', require('./routes/auth'));
     app.use('/api/categories', require('./routes/categories'));
@@ -185,6 +187,7 @@ mongoose.connect(process.env.MONGODB_URI)
     app.use('/api/ads', require('./routes/ads'));
     app.use('/api/feedposts', require('./routes/feedposts'));
     app.use('/api/sales', require('./routes/sales'));
+    app.use('/api/deliveryslots', require('./routes/deliverySlots'));
 
     // Base route
     app.get('/', (req, res) => {
