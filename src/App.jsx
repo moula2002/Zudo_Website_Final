@@ -159,7 +159,7 @@ function App() {
         const savedTenantId = localStorage.getItem('zudo_tenant_id');
         const locationHeader = savedTenantId || selectedCity || '';
 
-        // Now using API_URL which is set to localhost
+        // Now using API_URL which is set to production
         const profileRes = await fetch(`${API_URL}/auth/profile`, {
           headers: { 
             'Authorization': `Bearer ${token}`,
@@ -520,7 +520,7 @@ function App() {
     <div className="min-h-screen bg-[#f8f9fa] dark:bg-[#0a0a0a] text-gray-900 dark:text-white font-sans overflow-x-hidden relative flex flex-col transition-colors duration-500">
       {connectionError && (
         <div className="fixed top-0 left-0 right-0 z-[9999] bg-red-600 text-white text-center py-3 font-black text-xs uppercase tracking-widest animate-pulse shadow-lg">
-          ⚠️ BACKEND CONNECTION FAILED (Localhost:5000)
+          ⚠️ BACKEND CONNECTION FAILED (Server Offline)
         </div>
       )}
       <Navbar 
