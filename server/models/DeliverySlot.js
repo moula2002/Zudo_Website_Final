@@ -3,11 +3,11 @@ const mongoose = require('mongoose');
 const deliverySlotSchema = new mongoose.Schema({
   startTime: {
     type: String,
-    required: true
+    required: false
   },
   endTime: {
     type: String,
-    required: true
+    required: false
   },
   isActive: {
     type: Boolean,
@@ -17,7 +17,15 @@ const deliverySlotSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  globalIsSameDay: {
+    type: Boolean,
+    default: false
+  },
   orderedBeforeTime: {
+    type: String,
+    required: false
+  },
+  SameDayCutoff: {
     type: String,
     required: false
   },

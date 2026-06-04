@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ShoppingCart, Heart, ArrowLeft, Star, Plus, Minus, Share2, Package, Truck, ShieldCheck, Clock, X, CheckCircle2, Upload, Camera, Image as ImageIcon, Trash2 } from 'lucide-react';
-import { API_URL, API_BASE_URL, IMAGE_BASE_URL, cleanImageUrl } from '../config';
+import { API_URL, API_BASE_URL, IMAGE_BASE_URL, cleanImageUrl, UPLOAD_URL } from '../config';
 import ProductCard from './ProductCard';
 
 export default function ProductDetails({ product, onAddToCart, onToggleWishlist, isWishlisted, onNavigate, onNavigateToProduct, wishlistItems, cartItems, onUpdateQuantity, allProducts, isB2B, user }) {
@@ -9,6 +9,39 @@ export default function ProductDetails({ product, onAddToCart, onToggleWishlist,
   const [reviewLoading, setReviewLoading] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [message, setMessage] = useState({ text: '', type: '' });
+
+  // Get active variant lists based on portal mode (B2B vs B2C)
+  const variantsList = isB2B ? (product?.b2b || []) : (product?.b2c || []);
+  
+  // Track selected packet size variant locally in details screen
+  const [selectedVariant, setSelectedVariant] = useState(() => {
+    if (variantsList && variantsList.length > 0) {
+      return variantsList[0];
+    }
+    return null;
+  });
+
+  // Derived state values based on active selector
+  const activeSize = selectedVariant ? selectedVariant.packetSize : (product?.packetSize || product?.unit || '1 unit');
+  const activePrice = selectedVariant ? selectedVariant.price : product?.price;
+  const activeMrp = selectedVariant ? selectedVariant.mrp : (product?.oldPrice || product?.price);
+  const activeStock = selectedVariant ? (selectedVariant.stock !== undefined ? selectedVariant.stock : product?.stock) : product?.stock;
+  const activeGst = selectedVariant ? (selectedVariant.gstPercent || product?.gstPercent || 0) : (product?.gstPercent || 0);
+  const activeMoq = isB2B ? (product?.moq || 1) : 1;
+
+  // Uniquely identify the selected item size variant in the shopping cart
+  const cartItemKey = `${product?.id}_${activeSize}`;
+  const cartItem = cartItems?.find(item => item.cartKey === cartItemKey);
+  const currentQuantity = cartItem ? cartItem.quantity : 0;
+
+  // Sync state if product changes
+  useEffect(() => {
+    if (variantsList && variantsList.length > 0) {
+      setSelectedVariant(variantsList[0]);
+    } else {
+      setSelectedVariant(null);
+    }
+  }, [product?.id, isB2B]);
 
   const handleShare = async () => {
     try {
@@ -54,13 +87,13 @@ export default function ProductDetails({ product, onAddToCart, onToggleWishlist,
     const formData = new FormData();
     formData.append('file', file);
     try {
-      const response = await fetch(`${IMAGE_BASE_URL}/api/upload`, {
+      const response = await fetch(UPLOAD_URL, {
         method: 'POST',
         body: formData
       });
       if (!response.ok) throw new Error('Upload failed');
       const data = await response.json();
-      const imageUrl = cleanImageUrl(`${IMAGE_BASE_URL}${data.url}`);
+      const imageUrl = cleanImageUrl(data.url);
       setNewReview(prev => ({
         ...prev,
         media: [...prev.media, { url: imageUrl, type: 'image' }]
@@ -138,7 +171,7 @@ export default function ProductDetails({ product, onAddToCart, onToggleWishlist,
             />
             <div className="absolute top-4 left-4 flex flex-col gap-2">
               <span className="px-3 py-1 bg-white/90 dark:bg-emerald-600 backdrop-blur-md text-emerald-700 dark:text-white rounded-lg text-[9px] font-black uppercase tracking-widest shadow-sm border border-emerald-100/30">{product.category}</span>
-              {product.oldPrice && !isPending && (
+              {activeMrp && !isPending && Number(activeMrp) > Number(activePrice) && (
                 <span className="px-3 py-1 bg-red-500 text-white rounded-lg text-[9px] font-black uppercase tracking-widest shadow-lg shadow-red-500/20 w-fit">Sale</span>
               )}
             </div>
@@ -167,8 +200,30 @@ export default function ProductDetails({ product, onAddToCart, onToggleWishlist,
 
             <h1 className="text-3xl font-black text-gray-900 dark:text-white mb-4 tracking-tight leading-tight">{product.name}</h1>
 
+            {/* Packet Size Option Pill Selectors */}
+            {variantsList && variantsList.length > 0 && (
+              <div className="mb-6">
+                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Select Packet Size</span>
+                <div className="flex flex-wrap gap-2">
+                  {variantsList.map((v, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setSelectedVariant(v)}
+                      className={`text-xs font-black uppercase px-4 py-2.5 rounded-2xl border transition-all duration-300 ${
+                        activeSize === v.packetSize
+                          ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-600/20 scale-105'
+                          : 'bg-white dark:bg-white/5 border-gray-100 dark:border-white/10 text-gray-500 hover:border-emerald-200 hover:text-emerald-600'
+                      }`}
+                    >
+                      {v.packetSize}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Price Tiers Display */}
-            {product.priceTiers && product.priceTiers.length > 0 && (
+            {product.priceTiers && product.priceTiers.length > 0 && isB2B && (
               <div className="mb-6 p-4 bg-emerald-50/50 dark:bg-emerald-500/5 rounded-2xl border border-emerald-100 dark:border-emerald-500/10">
                 <div className="flex items-center gap-2 mb-3">
                   <Package size={14} className="text-emerald-600 dark:text-emerald-400" />
@@ -188,33 +243,26 @@ export default function ProductDetails({ product, onAddToCart, onToggleWishlist,
             <div className="flex items-center gap-4 mb-6">
               <div className="flex flex-col">
                 <span className={`text-3xl font-black ${isPending ? 'text-amber-500' : 'text-emerald-600'} tracking-tight`}>
-                  {(() => {
-                    if (isPending) return 'Verification Pending';
-                    const currentQty = cartItems.find(i => i.id === product.id)?.quantity || 1;
-                    let displayPrice = product.price;
-                    
-                    if (product.priceTiers && product.priceTiers.length > 0) {
-                      const sortedTiers = [...product.priceTiers].sort((a, b) => b.minQty - a.minQty);
-                      const activeTier = sortedTiers.find(t => currentQty >= t.minQty);
-                      if (activeTier) displayPrice = activeTier.price;
-                    }
-                    
-                    return displayPrice.toString().startsWith('₹') ? displayPrice : `₹${displayPrice}`;
-                  })()}
+                  {isPending ? 'Verification Pending' : `₹${activePrice}`}
                 </span>
-                {product.oldPrice && !isPending && (
-                  <span className="text-xs text-gray-400 font-bold flex items-center gap-2">
-                    <span className="line-through">₹{product.oldPrice}</span>
+                {activeMrp && !isPending && Number(activeMrp) > Number(activePrice) && (
+                  <span className="text-xs text-gray-400 font-bold flex items-center gap-2 mt-1">
+                    <span className="line-through">₹{activeMrp}</span>
                        <span className="text-red-500 text-[9px] uppercase tracking-tighter">
-                         -{Math.round((1 - (product.priceTiers?.[0]?.price || product.price)/product.oldPrice) * 100)}% Off
+                         -{Math.round((1 - activePrice/activeMrp) * 100)}% Off
                        </span>
                   </span>
                 )}
               </div>
-              <div className="h-8 w-px bg-gray-100 dark:bg-white/10"></div>
-              <div className="px-3 py-1 bg-emerald-50 dark:bg-emerald-500/10 rounded-xl border border-emerald-50 dark:border-emerald-500/20">
-                <p className="text-[8px] font-black text-emerald-700 dark:text-emerald-400 uppercase tracking-widest">Stock Status</p>
-                <p className="text-[11px] font-bold text-gray-800 dark:text-gray-200">In Stock</p>
+              <div className={`px-3 py-1 rounded-xl border transition-colors ${
+                (activeStock !== undefined && Number(activeStock) > 0)
+                  ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-50 dark:border-emerald-500/20 text-emerald-700 dark:text-emerald-400' 
+                  : 'bg-red-50 dark:bg-red-500/10 border-red-50 dark:border-red-500/20 text-red-700 dark:text-red-400'
+              }`}>
+                <p className="text-[8px] font-black uppercase tracking-widest opacity-85">Stock Status</p>
+                <p className="text-[11px] font-black">
+                  {(activeStock !== undefined && Number(activeStock) > 0) ? `${activeStock} pcs available` : 'Out of Stock'}
+                </p>
               </div>
             </div>
 
@@ -226,7 +274,6 @@ export default function ProductDetails({ product, onAddToCart, onToggleWishlist,
                   <span className="text-xs font-bold leading-none">
                     {product.sellerName && product.sellerName !== 'Zudo Official' ? product.sellerName : (product.sellerId?.businessName || product.sellerId?.name || 'Zudo Official')}
                   </span>
-                  <span className="text-[9px] text-gray-500 mt-1">ID: {product.sellerId?._id || product.sellerId || 'N/A'}</span>
                 </div>
               </div>
               {isB2B && (
@@ -236,6 +283,12 @@ export default function ProductDetails({ product, onAddToCart, onToggleWishlist,
                     <span className="text-[8px] font-black uppercase tracking-widest leading-none mb-1">B2B Verified</span>
                     <span className="text-xs font-bold leading-none">Wholesale Pricing</span>
                   </div>
+                </div>
+              )}
+              {isB2B && activeGst > 0 && (
+                <div className="px-4 py-2 bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 rounded-xl border border-blue-100 dark:border-blue-500/20 flex items-center gap-2">
+                  <span className="text-[8px] font-black uppercase tracking-widest leading-none mb-1">Tax Inclusive</span>
+                  <span className="text-xs font-bold leading-none">{activeGst}% GST</span>
                 </div>
               )}
             </div>
@@ -249,15 +302,14 @@ export default function ProductDetails({ product, onAddToCart, onToggleWishlist,
             <div className="space-y-4">
               <div className="flex items-center gap-3">
                 <div className="flex items-center bg-white dark:bg-white/5 rounded-xl p-1 border border-gray-200 dark:border-white/10 transition-colors">
-                  <button onClick={() => onUpdateQuantity(product.id, -1)} className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-gray-50 dark:hover:bg-white/10 text-gray-900 dark:text-white transition-all"><Minus size={16} /></button>
-                  <span className="w-10 text-center font-black text-base dark:text-white">{cartItems.find(i => i.id === product.id)?.quantity || 1}</span>
+                  <button onClick={() => onUpdateQuantity(cartItemKey, -1)} className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-gray-50 dark:hover:bg-white/10 text-gray-900 dark:text-white transition-all"><Minus size={16} /></button>
+                  <span className="w-10 text-center font-black text-base dark:text-white">{currentQuantity > 0 ? currentQuantity : activeMoq}</span>
                   <button 
                     onClick={() => {
-                      const item = cartItems.find(i => i.id === product.id);
-                      if (item) {
-                        onUpdateQuantity(product.id, 1);
+                      if (currentQuantity > 0) {
+                        onUpdateQuantity(cartItemKey, 1);
                       } else {
-                        onAddToCart(product);
+                        onAddToCart(product, selectedVariant);
                       }
                     }} 
                     className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-gray-50 dark:hover:bg-white/10 text-gray-900 dark:text-white transition-all"
@@ -267,16 +319,15 @@ export default function ProductDetails({ product, onAddToCart, onToggleWishlist,
                 </div>
                 <button 
                   onClick={() => {
-                    const isAlreadyInCart = cartItems.some(i => i.id === product.id);
-                    if (isAlreadyInCart) {
+                    if (currentQuantity > 0) {
                       onNavigate('cart');
                     } else {
-                      onAddToCart(product);
+                      onAddToCart(product, selectedVariant);
                     }
                   }} 
                   className="flex-grow h-12 bg-emerald-600 text-white rounded-xl font-black uppercase tracking-widest text-xs hover:bg-emerald-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 active:scale-[0.98]"
                 >
-                  <ShoppingCart size={18} /> {cartItems.some(i => i.id === product.id) ? 'View in Cart' : 'Add to Cart'}
+                  <ShoppingCart size={18} /> {currentQuantity > 0 ? 'View in Cart' : 'Add to Cart'}
                 </button>
               </div>
               <div className="flex gap-3">
@@ -472,6 +523,7 @@ export default function ProductDetails({ product, onAddToCart, onToggleWishlist,
                   onToggleWishlist={onToggleWishlist}
                   isWishlisted={wishlistItems.some(item => item.id === p.id)}
                   quantity={cartItems.find(item => item.id === p.id)?.quantity || 0}
+                  cartItems={cartItems}
                 />
               </div>
             ))}

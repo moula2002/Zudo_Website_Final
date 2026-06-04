@@ -15,22 +15,39 @@ const { protect } = require('../middleware/auth');
 const findCommissionForProduct = (product, commissions) => {
   const pCatId = product.categoryId?._id?.toString() || product.categoryId?.toString();
   if (!pCatId) return null;
-  
+
   const catCommissions = commissions.filter(c => c.categoryId?.toString() === pCatId);
   if (catCommissions.length === 0) return null;
-  
-  // 1. Try to find a unit-specific match (case-insensitive)
+
+  // 1. Try to find a unit-specific match (case-insensitive, normalized)
   if (product.unit) {
-    const unitMatch = catCommissions.find(c => c.unit && c.unit.trim().toLowerCase() === product.unit.trim().toLowerCase());
+    const pUnitClean = product.unit.trim().toLowerCase();
+    const unitMatch = catCommissions.find(c => {
+      if (!c.unit) return false;
+      const cUnitClean = c.unit.trim().toLowerCase();
+      
+      // Exact match
+      if (cUnitClean === pUnitClean) return true;
+      
+      // Common plurals/singulars/abbreviations mapping
+      if ((cUnitClean === 'pc' || cUnitClean === 'pcs') && 
+          (pUnitClean === 'pc' || pUnitClean === 'pcs' || pUnitClean === 'piece' || pUnitClean === 'pieces')) return true;
+      if ((cUnitClean === 'kg' || cUnitClean === 'kgs') && 
+          (pUnitClean === 'kg' || pUnitClean === 'kgs' || pUnitClean === '1kg')) return true;
+      if ((cUnitClean === 'ltr' || cUnitClean === 'ltrs' || cUnitClean === 'liter' || cUnitClean === 'litre') && 
+          (pUnitClean === 'ltr' || pUnitClean === 'ltrs' || pUnitClean === 'liter' || pUnitClean === 'litre' || pUnitClean === '1ltr')) return true;
+          
+      return false;
+    });
     if (unitMatch) return unitMatch;
   }
-  
-  // 2. Fall back to a commission with no unit specified
-  const fallbackMatch = catCommissions.find(c => !c.unit);
-  if (fallbackMatch) return fallbackMatch;
-  
-  // 3. Permissive fallback to first category commission if no unit matches and no unitless exists
-  return catCommissions[0] || null;
+
+  // 2. Try to find a commission with no unit specified (fallback)
+  const noUnitMatch = catCommissions.find(c => !c.unit || c.unit.trim() === '');
+  if (noUnitMatch) return noUnitMatch;
+
+  // 3. Fall back to the first available commission for this category
+  return catCommissions[0];
 };
 
 // Helper to calculate commissioned price
@@ -60,7 +77,7 @@ const storage = multer.diskStorage({
   }
 });
 
-const upload = multer({ 
+const upload = multer({
   storage: storage,
   fileFilter: (req, file, cb) => {
     const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
@@ -77,16 +94,16 @@ router.get('/', async (req, res) => {
     console.log('[DEBUG] Route GET /api/products called');
     const products = await Product.find().populate('categoryId').populate('subCategoryId');
     console.log(`[DEBUG] Found ${products.length} products`);
-    
+
     // Fetch all commissions
     const Commission = require('../models/Commission');
     const commissions = await Commission.find();
-    
+
     // Manually fetch seller names to be 100% sure
     const productsWithSellers = await Promise.all(products.map(async (product) => {
       try {
         const p = product.toObject();
-        
+
         // Apply commission
         const comm = findCommissionForProduct(p, commissions);
         if (comm) {
@@ -96,25 +113,72 @@ router.get('/', async (req, res) => {
             p.originalB2BPrice = p.b2bPrice;
             p.b2bPrice = getCommissionedPrice(p.b2bPrice, comm);
           }
+
+          // Apply to b2b variants
+          if (p.b2b && Array.isArray(p.b2b)) {
+            p.b2b = p.b2b.map(v => {
+              const updatedVar = { ...v };
+              if (updatedVar.price !== undefined) {
+                updatedVar.originalPrice = updatedVar.price;
+                updatedVar.price = getCommissionedPrice(updatedVar.price, comm);
+              }
+              // Apply to priceTiers inside variant
+              if (updatedVar.priceTiers && Array.isArray(updatedVar.priceTiers)) {
+                updatedVar.priceTiers = updatedVar.priceTiers.map(tier => {
+                  const updatedTier = { ...tier };
+                  if (updatedTier.price !== undefined) {
+                    updatedTier.originalPrice = updatedTier.price;
+                    updatedTier.price = getCommissionedPrice(updatedTier.price, comm);
+                  }
+                  return updatedTier;
+                });
+              }
+              return updatedVar;
+            });
+          }
+
+          // Apply to b2c variants
+          if (p.b2c && Array.isArray(p.b2c)) {
+            p.b2c = p.b2c.map(v => {
+              const updatedVar = { ...v };
+              if (updatedVar.price !== undefined) {
+                updatedVar.originalPrice = updatedVar.price;
+                updatedVar.price = getCommissionedPrice(updatedVar.price, comm);
+              }
+              return updatedVar;
+            });
+          }
+
+          // Apply to top-level priceTiers
+          if (p.priceTiers && Array.isArray(p.priceTiers)) {
+            p.priceTiers = p.priceTiers.map(tier => {
+              const updatedTier = { ...tier };
+              if (updatedTier.price !== undefined) {
+                updatedTier.originalPrice = updatedTier.price;
+                updatedTier.price = getCommissionedPrice(updatedTier.price, comm);
+              }
+              return updatedTier;
+            });
+          }
         }
 
         if (p.sellerId) {
           // Try Mongoose first
           let seller = await Seller.findById(p.sellerId);
-          
+
           // Fallback to direct DB query if Mongoose fails
           if (!seller) {
             const db = Product.db;
             if (db) {
-              seller = await db.collection('sellers').findOne({ 
-                _id: p.sellerId instanceof mongoose.Types.ObjectId ? p.sellerId : new mongoose.Types.ObjectId(p.sellerId) 
+              seller = await db.collection('sellers').findOne({
+                _id: p.sellerId instanceof mongoose.Types.ObjectId ? p.sellerId : new mongoose.Types.ObjectId(p.sellerId)
               });
             }
           }
 
           if (seller) {
             p.sellerName = seller.businessName || seller.name;
-            p.sellerId = seller; 
+            p.sellerId = seller;
           } else {
             p.sellerName = "Zudo Official";
           }
@@ -139,7 +203,7 @@ router.get('/', async (req, res) => {
 router.post('/', protect, upload.fields([{ name: 'image', maxCount: 1 }, { name: 'pdf', maxCount: 1 }]), async (req, res) => {
   try {
     const { name, categoryId, subCategoryId, price, b2bPrice, moq, unit } = req.body;
-    
+
     let imageUrl = req.body.imageUrl || '';
     if (req.files && req.files['image']) {
       imageUrl = `/uploads/${req.files['image'][0].filename}`;
@@ -186,9 +250,9 @@ router.post('/bulk-upload', protect, upload.single('file'), async (req, res) => 
       // Find or create Category
       let category = await Category.findOne({ name: item.Category });
       if (!category) {
-        category = await Category.create({ 
-          name: item.Category, 
-          imageUrl: item.CategoryImageUrl || '/uploads/default-category.png' 
+        category = await Category.create({
+          name: item.Category,
+          imageUrl: item.CategoryImageUrl || '/uploads/default-category.png'
         });
       }
 
@@ -197,10 +261,10 @@ router.post('/bulk-upload', protect, upload.single('file'), async (req, res) => 
       if (item.SubCategory) {
         subCategory = await SubCategory.findOne({ name: item.SubCategory, categoryId: category._id });
         if (!subCategory) {
-          subCategory = await SubCategory.create({ 
-            name: item.SubCategory, 
+          subCategory = await SubCategory.create({
+            name: item.SubCategory,
             imageUrl: item.SubCategoryImageUrl || '/uploads/default-subcategory.png',
-            categoryId: category._id 
+            categoryId: category._id
           });
         }
       }

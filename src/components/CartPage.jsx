@@ -1,10 +1,48 @@
 import React from 'react';
 import { Trash2, ArrowLeft, ShoppingBag, CreditCard, ChevronRight, ShieldCheck, Clock } from 'lucide-react';
-import { cleanImageUrl } from '../config';
+import { cleanImageUrl, API_URL } from '../config';
 
 export default function CartPage({ cartItems, onUpdateQuantity, onRemove, onNavigate, isB2B }) {
   const user = JSON.parse(localStorage.getItem('user') || 'null');
   const isB2BPending = user?.role === 'b2b' && !user.isVerified;
+
+  const [settings, setSettings] = React.useState({
+    minimumBillAmountB2B: 2000,
+    minimumBillAmountB2C: 1000
+  });
+
+  React.useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const selectedCity = localStorage.getItem('selectedCity');
+        const savedTenantId = localStorage.getItem('zudo_tenant_id');
+        const locationHeader = savedTenantId || selectedCity || '';
+
+        const res = await fetch(`${API_URL}/commissions/public/minimum-billing`, {
+          headers: {
+            'x-tenant-id': locationHeader,
+            'x-location': locationHeader
+          }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setSettings(data);
+        }
+      } catch (err) {
+        console.error('Failed to fetch billing settings:', err);
+      }
+    };
+    fetchSettings();
+  }, []);
+
+  const minBillingAmount = isB2B ? settings.minimumBillAmountB2B : settings.minimumBillAmountB2C;
+
+  const formatPrice = (val) => {
+    if (val === undefined || val === null) return '0';
+    const priceStr = String(val).replace(/[^\d.]/g, '');
+    const num = parseFloat(priceStr) || 0;
+    return Number.isInteger(num) ? String(num) : num.toFixed(2);
+  };
 
   // Helper to get tiered price
   const getItemPrice = (item) => {
@@ -14,7 +52,8 @@ export default function CartPage({ cartItems, onUpdateQuantity, onRemove, onNavi
       if (activeTier) return activeTier.price;
     }
     const priceStr = String(item.price);
-    return parseInt(priceStr.replace(/\D/g, '')) || 0;
+    const cleanedPrice = priceStr.replace(/[^\d.]/g, '');
+    return parseFloat(cleanedPrice) || 0;
   };
 
   const subtotal = cartItems.reduce((acc, item) => {
@@ -100,7 +139,9 @@ export default function CartPage({ cartItems, onUpdateQuantity, onRemove, onNavi
                     </div>
                     
                     <div className="flex-grow">
-                      <h3 className="text-lg font-black text-gray-900 mb-0.5 leading-tight">{item.name}</h3>
+                      <h3 className="text-lg font-black text-gray-900 mb-0.5 leading-tight">
+                        {item.name} {item.selectedPacketSize && `(${item.selectedPacketSize})`}
+                      </h3>
                       <div className="flex items-center gap-1.5 mb-2">
                         <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Seller:</span>
                         <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100/50">
@@ -110,7 +151,7 @@ export default function CartPage({ cartItems, onUpdateQuantity, onRemove, onNavi
                         </span>
                       </div>
                       <div className="flex flex-col items-end">
-                        <div className="text-emerald-600 font-black text-xl tracking-tighter">₹{getItemPrice(item)}</div>
+                        <div className="text-emerald-600 font-black text-xl tracking-tighter">₹{formatPrice(getItemPrice(item))}</div>
                         {item.priceTiers?.some(t => item.quantity >= t.minQty) && (
                           <span className="text-[8px] font-black text-emerald-500 uppercase tracking-widest bg-emerald-50 px-1.5 py-0.5 rounded-md mt-1 border border-emerald-100">Bulk Applied</span>
                         )}
@@ -160,17 +201,17 @@ export default function CartPage({ cartItems, onUpdateQuantity, onRemove, onNavi
               <div className="space-y-5 mb-8">
                 <div className="flex justify-between text-gray-500 font-bold">
                   <span className="text-sm">Subtotal ({cartItems.length} items)</span>
-                  <span className="text-gray-900 font-black">₹{subtotal}</span>
+                  <span className="text-gray-900 font-black">₹{formatPrice(subtotal)}</span>
                 </div>
                 <div className="flex justify-between text-gray-500 font-bold">
                   <span className="text-sm">Delivery Fee</span>
                   <span className="text-gray-900">
-                    {deliveryFee === 0 ? <span className="text-emerald-600 font-black uppercase text-xs tracking-widest">Free</span> : `₹${deliveryFee}`}
+                    {deliveryFee === 0 ? <span className="text-emerald-600 font-black uppercase text-xs tracking-widest">Free</span> : `₹${formatPrice(deliveryFee)}`}
                   </span>
                 </div>
                 {subtotal < 500 && (
                   <div className="text-[10px] font-black text-emerald-700 bg-emerald-50/50 p-4 rounded-2xl border border-emerald-100 text-center uppercase tracking-widest">
-                    Add ₹{500 - subtotal} more for Free Delivery!
+                    Add ₹{formatPrice(500 - subtotal)} more for Free Delivery!
                   </div>
                 )}
               </div>
@@ -179,31 +220,44 @@ export default function CartPage({ cartItems, onUpdateQuantity, onRemove, onNavi
                 <div className="flex justify-between items-end">
                   <span className="text-lg font-black text-gray-900">Total Bill</span>
                   <div className="text-right">
-                    <span className="text-4xl font-black text-emerald-600 tracking-tighter">₹{total}</span>
+                    <span className="text-4xl font-black text-emerald-600 tracking-tighter">₹{formatPrice(total)}</span>
                     <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mt-1">Inc. all taxes</p>
                   </div>
                 </div>
               </div>
 
-              {isB2B && subtotal < 2000 && (
+              {/* Dynamic Settings Info Card */}
+              <div className="mb-6 p-5 bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-2xl">
+                <h4 className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-3 leading-none">
+                  {isB2B ? 'B2B Wholesale Settings' : 'B2C Retail Settings'}
+                </h4>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center text-xs font-bold text-gray-500">
+                    <span>Minimum Bill Amount</span>
+                    <span className="text-gray-900 dark:text-white font-black">₹{minBillingAmount}</span>
+                  </div>
+                </div>
+              </div>
+
+              {subtotal < minBillingAmount && (
                 <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-2xl flex items-center gap-3 animate-pulse">
                   <div className="w-2 h-2 bg-red-500 rounded-full"></div>
                   <p className="text-[10px] font-black text-red-600 uppercase tracking-widest leading-tight">
-                    Minimum B2B order value is ₹2000. Add ₹{2000 - subtotal} more.
+                    Minimum {isB2B ? 'B2B' : 'B2C'} order value is ₹{formatPrice(minBillingAmount)}. Add ₹{formatPrice(minBillingAmount - subtotal)} more.
                   </p>
                 </div>
               )}
 
               <button 
                 onClick={() => {
-                  if (isB2B && subtotal < 2000) {
-                    alert('B2B orders must be at least ₹2000');
+                  if (subtotal < minBillingAmount) {
+                    alert(`${isB2B ? 'B2B' : 'B2C'} orders must be at least ₹${minBillingAmount}`);
                     return;
                   }
                   onNavigate('checkout');
                 }}
-                disabled={isB2B && subtotal < 2000}
-                className={`w-full ${isB2B && subtotal < 2000 ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#107569] hover:bg-[#0d6359]'} text-white font-black py-5 rounded-2xl shadow-2xl shadow-emerald-900/20 transform hover:-translate-y-1 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3 group`}
+                disabled={subtotal < minBillingAmount}
+                className={`w-full ${subtotal < minBillingAmount ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#107569] hover:bg-[#0d6359]'} text-white font-black py-5 rounded-2xl shadow-2xl shadow-emerald-900/20 transform hover:-translate-y-1 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3 group`}
               >
                 Proceed to Checkout
                 <ChevronRight size={20} className="group-hover:translate-x-1 transition-transform" />

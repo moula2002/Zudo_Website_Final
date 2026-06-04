@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Package, Calendar, Clock, ChevronRight, ShoppingBag, ArrowLeft, CheckCircle2, Truck, AlertCircle, MapPin, Receipt, ExternalLink, ChevronDown, ChevronUp, User, Phone, Camera, Upload, X, Search, Filter, Navigation as NavIcon } from 'lucide-react';
-import { API_URL, API_BASE_URL, IMAGE_BASE_URL, cleanImageUrl } from '../config';
+import { API_URL, API_BASE_URL, IMAGE_BASE_URL, cleanImageUrl, UPLOAD_URL } from '../config';
 import { generateInvoice } from '../utils/invoiceGenerator';
 
 export default function OrdersPage({ onNavigate, user }) {
@@ -12,8 +12,8 @@ export default function OrdersPage({ onNavigate, user }) {
 
     const apiBase = API_BASE_URL;
 
-  const [returnModal, setReturnModal] = useState({ open: false, order: null });
-  const [returnForm, setReturnForm] = useState({ selectedReason: '', comment: '', image: null, preview: null });
+  const [returnModal, setReturnModal] = useState({ open: false, order: null, item: null });
+  const [returnForm, setReturnForm] = useState({ selectedReason: '', comment: '', image: null, preview: null, refundAccountName: '', refundBankName: '', refundAccountNumber: '', refundIfscCode: '' });
   const [submittingReturn, setSubmittingReturn] = useState(false);
   const [filterStatus, setFilterStatus] = useState('All');
   const [searchTerm, setSearchTerm] = useState('');
@@ -155,20 +155,70 @@ export default function OrdersPage({ onNavigate, user }) {
     }
   };
 
+  const returnOrderItem = async (orderId, itemId, returnData) => {
+    try {
+      const selectedCity = localStorage.getItem('selectedCity');
+      const savedTenantId = localStorage.getItem('zudo_tenant_id');
+      const locationHeader = savedTenantId || selectedCity || '';
+
+      const response = await fetch(`${apiBase}/api/orders/${orderId}/items/${itemId}/return`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'x-location': locationHeader,
+          'x-tenant-id': locationHeader
+        },
+        body: JSON.stringify({
+          returnReason: returnData.reason,
+          returnComment: returnData.comment,
+          returnImage: returnData.image,
+          refundAccountName: returnData.refundAccountName,
+          refundBankName: returnData.refundBankName,
+          refundAccountNumber: returnData.refundAccountNumber,
+          refundIfscCode: returnData.refundIfscCode
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const updatedOrder = data.order;
+        // Update the orders state with the updated order
+        const updatedOrders = orders.map(order => 
+          order._id === orderId ? updatedOrder : order
+        );
+        setOrders(updatedOrders);
+        return true;
+      } else {
+        const errData = await response.json();
+        alert(errData.message || 'Failed to submit return request');
+        return false;
+      }
+    } catch (err) {
+      console.error('Failed to return item:', err);
+      alert('Error connecting to the server. Please try again.');
+      return false;
+    }
+  };
+
   const handleReturnSubmit = async (e) => {
     e.preventDefault();
     if (!returnForm.selectedReason) return alert('Please select a reason for return');
     if (!returnForm.image) return alert('Please upload an evidence photo');
+    if (!returnForm.refundAccountName.trim()) return alert('Please enter the Account Holder Name');
+    if (!returnForm.refundBankName.trim()) return alert('Please enter the Bank Name');
+    if (!returnForm.refundAccountNumber.trim()) return alert('Please enter the Bank Account Number');
+    if (!returnForm.refundIfscCode.trim()) return alert('Please enter the Bank IFSC Code');
     
     setSubmittingReturn(true);
     let imageUrl = '';
-
+ 
     try {
       // 1. Upload Image if exists
       if (returnForm.image) {
         const formData = new FormData();
         formData.append('file', returnForm.image);
-        const uploadRes = await fetch(`${IMAGE_BASE_URL}/api/upload`, {
+        const uploadRes = await fetch(UPLOAD_URL, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -176,19 +226,23 @@ export default function OrdersPage({ onNavigate, user }) {
           body: formData
         });
         const uploadData = await uploadRes.json();
-        if (uploadRes.ok) imageUrl = cleanImageUrl(`${IMAGE_BASE_URL}${uploadData.url}`);
+        if (uploadRes.ok) imageUrl = cleanImageUrl(uploadData.url);
       }
-
-      // 2. Update Order Status to Returned with separate reason, comment and image
-      const success = await updateOrderStatus(returnModal.order._id, 'Returned', {
+ 
+      // 2. Return the single item
+      const success = await returnOrderItem(returnModal.order._id, returnModal.item._id, {
         reason: returnForm.selectedReason,
         comment: returnForm.comment,
-        image: imageUrl
+        image: imageUrl,
+        refundAccountName: returnForm.refundAccountName,
+        refundBankName: returnForm.refundBankName,
+        refundAccountNumber: returnForm.refundAccountNumber,
+        refundIfscCode: returnForm.refundIfscCode
       });
-
+ 
       if (success) {
-        setReturnModal({ open: false, order: null });
-        setReturnForm({ selectedReason: '', comment: '', image: null, preview: null });
+        setReturnModal({ open: false, order: null, item: null });
+        setReturnForm({ selectedReason: '', comment: '', image: null, preview: null, refundAccountName: '', refundBankName: '', refundAccountNumber: '', refundIfscCode: '' });
       }
     } catch (err) {
       console.error('Return failed:', err);
@@ -215,7 +269,7 @@ export default function OrdersPage({ onNavigate, user }) {
 
 
   const canReturn = (order) => {
-    if (order.orderStatus !== 'Delivered') return false;
+    if (order.orderStatus !== 'Delivered' && order.orderStatus !== 'Partially Returned') return false;
     const deliveredDate = new Date(order.updatedAt || order.createdAt);
     const today = new Date();
     const diffTime = Math.abs(today - deliveredDate);
@@ -228,11 +282,15 @@ export default function OrdersPage({ onNavigate, user }) {
     switch (s) {
       case 'delivered': return 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20';
       case 'returned': return 'bg-purple-500 text-white shadow-lg shadow-purple-500/20';
+      case 'partially returned': return 'bg-purple-400 text-white shadow-lg shadow-purple-400/20';
       case 'shipped': return 'bg-blue-500 text-white shadow-lg shadow-blue-500/20';
       case 'out for delivery': return 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/20';
       case 'processing': return 'bg-amber-500 text-white shadow-lg shadow-amber-500/20';
       case 'pending': return 'bg-gray-500 text-white shadow-lg shadow-gray-500/20';
       case 'cancelled': return 'bg-red-500 text-white shadow-lg shadow-red-500/20';
+      case 'return requested': return 'bg-amber-500 text-white shadow-lg shadow-amber-500/20';
+      case 'return driver assigned': return 'bg-cyan-500 text-white shadow-lg shadow-cyan-500/20';
+      case 'out for return': return 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/20';
       default: return 'bg-gray-400 text-white shadow-lg shadow-gray-400/20';
     }
   };
@@ -242,12 +300,44 @@ export default function OrdersPage({ onNavigate, user }) {
     switch (s) {
       case 'delivered': return <CheckCircle2 size={14} />;
       case 'returned': return <ArrowLeft size={14} />;
+      case 'partially returned': return <ArrowLeft size={14} />;
       case 'shipped': return <Truck size={14} />;
       case 'out for delivery': return <Truck size={14} className="animate-pulse" />;
       case 'processing': return <Clock size={14} />;
       case 'cancelled': return <X size={14} />;
+      case 'return requested': return <ArrowLeft size={14} className="animate-pulse" />;
+      case 'return driver assigned': return <Truck size={14} className="animate-pulse" />;
+      case 'out for return': return <Truck size={14} className="animate-pulse" />;
       default: return <Package size={14} />;
     }
+  };
+
+  const getItemReturnStatusBadge = (item, order) => {
+    const status = item.returnStatus;
+    if (status && status !== 'None') {
+      let style = 'bg-gray-50 text-gray-700 border-gray-100';
+      if (status === 'Return Requested') style = 'bg-amber-50 text-amber-700 border-amber-200';
+      else if (status === 'Return Approved') style = 'bg-blue-50 text-blue-700 border-blue-200';
+      else if (status === 'Return Rejected') style = 'bg-red-50 text-red-700 border-red-200';
+      else if (status === 'Picked Up from Customer') style = 'bg-indigo-50 text-indigo-700 border-indigo-200';
+      else if (status === 'Returned to Seller') style = 'bg-purple-50 text-purple-700 border-purple-200';
+
+      return (
+        <span className={`px-2.5 py-1 border rounded-lg text-[9px] font-black uppercase tracking-wider ${style}`}>
+          {status}
+        </span>
+      );
+    }
+    
+    // Fallbacks for legacy/globally returned states
+    if (item.isReturned || order.orderStatus === 'Returned') {
+      return (
+        <span className="px-2.5 py-1 bg-purple-50 text-purple-700 border border-purple-100 rounded-lg text-[9px] font-black uppercase tracking-wider">
+          Returned
+        </span>
+      );
+    }
+    return null;
   };
 
   const formatImageUrl = (url) => {
@@ -358,6 +448,10 @@ export default function OrdersPage({ onNavigate, user }) {
                 <option value="Delivered">Delivered</option>
                 <option value="Cancelled">Cancelled</option>
                 <option value="Returned">Returned</option>
+                <option value="Partially Returned">Partially Returned</option>
+                <option value="Return Requested">Return Requested</option>
+                <option value="Return Driver Assigned">Return Driver Assigned</option>
+                <option value="Out for Return">Out for Return</option>
               </select>
             </div>
 
@@ -444,9 +538,14 @@ export default function OrdersPage({ onNavigate, user }) {
                           {order.items[0]?.name || order.items[0]?.product?.name || 'Order Details'}
                           {order.items.length > 1 && <span className="text-gray-400 font-bold ml-2 text-sm">& {order.items.length - 1} more</span>}
                         </h3>
-                        <div className="flex items-center gap-4 text-gray-500 font-bold text-xs uppercase tracking-tight">
+                        <div className="flex items-center gap-4 text-gray-500 font-bold text-xs uppercase tracking-tight flex-wrap">
                           <span className="flex items-center gap-1.5"><Calendar size={12} className="text-emerald-500" /> {new Date(order.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span>
                           <span className="flex items-center gap-1.5"><ShoppingBag size={12} className="text-emerald-500" /> {order.items.length} Items</span>
+                          {order.deliverySlot && (
+                            <span className="flex items-center gap-1.5 text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider">
+                              <Clock size={11} /> {order.deliverySlot}
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -509,6 +608,16 @@ export default function OrdersPage({ onNavigate, user }) {
                               {order.shippingAddress.phone}
                             </p>
                           </div>
+
+                          {order.deliverySlot && (
+                            <div className="bg-[#107569] text-white p-5 rounded-3xl border border-emerald-100 shadow-sm animate-[fadeIn_0.3s_ease-out]">
+                              <h4 className="text-[10px] font-black uppercase tracking-widest text-emerald-200 mb-1.5 flex items-center gap-1.5 leading-none">
+                                <Clock size={12} />
+                                Selected Delivery Slot
+                              </h4>
+                              <p className="font-black text-sm tracking-tight">{order.deliverySlot}</p>
+                            </div>
+                          )}
                         </div>
 
                         {/* Payment Summary */}
@@ -539,6 +648,7 @@ export default function OrdersPage({ onNavigate, user }) {
                                 order.orderStatus === 'Cancelled' ? 'bg-red-100 text-red-700' :
                                 order.orderStatus === 'Shipped' ? 'bg-blue-100 text-blue-700' :
                                 order.orderStatus === 'Returned' ? 'bg-purple-100 text-purple-700' :
+                                order.orderStatus === 'Partially Returned' ? 'bg-purple-100 text-purple-600' :
                                 'bg-amber-100 text-amber-700'
                               }`}>
                                 {order.orderStatus}
@@ -561,13 +671,10 @@ export default function OrdersPage({ onNavigate, user }) {
                                 </button>
                               )}
                               
-                              {order.orderStatus === 'Delivered' && canReturn(order) && (
-                                <button 
-                                  onClick={() => setReturnModal({ open: true, order })}
-                                  className="w-full py-3 bg-amber-50 text-amber-700 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-amber-600 hover:text-white transition-all"
-                                >
-                                  Return Order (3 Days Left)
-                                </button>
+                              {(order.orderStatus === 'Delivered' || order.orderStatus === 'Partially Returned') && canReturn(order) && (
+                                <div className="text-center p-3 bg-amber-50/50 border border-dashed border-amber-200 rounded-xl text-[10px] font-bold text-amber-800">
+                                  To return items, click "Return" next to each item below. (3 Days Left)
+                                </div>
                               )}
                             </div>
                           </div>
@@ -609,37 +716,78 @@ export default function OrdersPage({ onNavigate, user }) {
                       <div className="space-y-4">
                         <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest">Order Items</h3>
                         <div className="bg-white rounded-3xl border border-emerald-100 shadow-sm overflow-hidden">
-                          {order.items.map((item, idx) => (
-                            <div key={idx} className={`p-4 flex items-center justify-between gap-4 ${idx !== order.items.length - 1 ? 'border-bottom border-gray-50' : ''}`}>
-                              <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 rounded-xl bg-gray-50 overflow-hidden border border-gray-100">
-                                  <img src={formatImageUrl(item.product?.imageUrl || item.product?.image || item.image || item.imageUrl)} alt={item.product?.name || item.name} className="w-full h-full object-cover" />
-                                </div>
-                                <div>
-                                  <p className="font-black text-gray-900 text-sm leading-none mb-1">{item.product?.name || item.name || 'Unknown Product'}</p>
-                                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest font-mono">
-                                    {item.quantity} × ₹{item.price}
-                                    {item.normalPrice !== undefined && (
-                                      <span className="text-amber-600 ml-2 font-bold normal-case">
-                                        (Normal: ₹{item.normalPrice})
-                                      </span>
-                                    )}
-                                  </p>
-                                  <p className="text-[10px] font-bold text-emerald-600 mt-1 uppercase tracking-tight">
-                                    Sold by: {item.sellerName || item.product?.sellerName || item.productId?.sellerName || item.productId?.sellerId?.businessName || item.productId?.sellerId?.name || 'Zudo Official'}
-                                  </p>
-                                </div>
-                              </div>
-                              <div className="text-right">
-                                <div className="text-sm font-black text-gray-900">₹{item.quantity * item.price}</div>
-                                {item.normalPrice !== undefined && (
-                                  <div className="text-[10px] font-bold text-amber-600 mt-0.5">
-                                    Normal: ₹{item.quantity * item.normalPrice}
+                          {order.items.map((item, idx) => {
+                            // Resolve correct item price with robust fallbacks for zero base price data
+                            let resolvedPrice = item.price || 0;
+                            let resolvedNormalPrice = item.normalPrice !== undefined ? item.normalPrice : resolvedPrice;
+                            
+                            if (!resolvedPrice && item.productId) {
+                              const isB2B = localStorage.getItem('isB2B') === 'true' || order.userId?.role === 'b2b';
+                              const variants = isB2B ? (item.productId.b2b || []) : (item.productId.b2c || []);
+                              
+                              const itemName = item.name || '';
+                              const matchedVar = variants.find(v => 
+                                (v.packetSize && itemName.toLowerCase().includes(v.packetSize.toLowerCase())) ||
+                                (v.price && order.totalAmount % v.price === 0)
+                              ) || variants[0];
+                              
+                              if (matchedVar) {
+                                resolvedPrice = matchedVar.price;
+                                resolvedNormalPrice = matchedVar.price;
+                              }
+                            }
+                            
+                            if (!resolvedPrice && order.items.length === 1 && item.quantity > 0) {
+                              resolvedPrice = Math.round(order.totalAmount / item.quantity);
+                              resolvedNormalPrice = resolvedPrice;
+                            }
+
+                            return (
+                              <div key={idx} className={`p-4 flex items-center justify-between gap-4 ${idx !== order.items.length - 1 ? 'border-bottom border-gray-50' : ''}`}>
+                                <div className="flex items-center gap-4">
+                                  <div className="w-12 h-12 rounded-xl bg-gray-50 overflow-hidden border border-gray-100">
+                                    <img src={formatImageUrl(item.product?.imageUrl || item.product?.image || item.image || item.imageUrl)} alt={item.product?.name || item.name} className="w-full h-full object-cover" />
                                   </div>
-                                )}
+                                  <div>
+                                    <p className="font-black text-gray-900 text-sm leading-none mb-1">{item.product?.name || item.name || 'Unknown Product'}</p>
+                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest font-mono">
+                                      {item.quantity} × ₹{resolvedPrice}
+                                      {resolvedNormalPrice > 0 && resolvedNormalPrice !== resolvedPrice && (
+                                        <span className="text-amber-600 ml-2 font-bold normal-case">
+                                          (Normal: ₹{resolvedNormalPrice})
+                                        </span>
+                                      )}
+                                    </p>
+                                    <p className="text-[10px] font-bold text-emerald-600 mt-1 uppercase tracking-tight">
+                                      Sold by: {item.sellerName || item.product?.sellerName || item.productId?.sellerName || item.productId?.sellerId?.businessName || item.productId?.sellerId?.name || 'Zudo Official'}
+                                    </p>
+                                  </div>
+                                </div>
+                                <div className="text-right flex flex-col items-end gap-1.5">
+                                  <div className="text-sm font-black text-gray-900">₹{item.quantity * resolvedPrice}</div>
+                                  {resolvedNormalPrice > 0 && resolvedNormalPrice !== resolvedPrice && (
+                                    <div className="text-[10px] font-bold text-amber-600 mt-0.5">
+                                      Normal: ₹{item.quantity * resolvedNormalPrice}
+                                    </div>
+                                  )}
+                                  
+                                  {/* Item Return Status / Badge or Button */}
+                                  {getItemReturnStatusBadge(item, order) ? (
+                                    getItemReturnStatusBadge(item, order)
+                                  ) : (
+                                    (order.orderStatus === 'Delivered' || order.orderStatus === 'Partially Returned') && canReturn(order) && (
+                                      <button
+                                        onClick={() => setReturnModal({ open: true, order, item })}
+                                        className="px-2.5 py-1 bg-amber-50 hover:bg-amber-500 text-amber-700 hover:text-white border border-amber-200 hover:border-amber-500 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all"
+                                      >
+                                        Return
+                                      </button>
+                                    )
+                                  )}
+                                </div>
                               </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       </div>
                     </div>
@@ -654,15 +802,17 @@ export default function OrdersPage({ onNavigate, user }) {
       {/* Return Request Modal */}
       {returnModal.open && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => !submittingReturn && setReturnModal({ open: false, order: null })}></div>
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => !submittingReturn && setReturnModal({ open: false, order: null, item: null })}></div>
           <div className="bg-white w-full max-w-md rounded-2xl shadow-xl relative z-10 overflow-hidden animate-[scaleIn_0.2s_ease-out]">
             <div className="bg-white p-6 border-b border-gray-100 flex items-center justify-between">
               <div>
-                <h2 className="text-lg font-bold text-gray-900">Return Request</h2>
-                <p className="text-gray-500 text-xs font-medium mt-0.5">Order #{returnModal.order?._id.slice(-6).toUpperCase()}</p>
+                <h2 className="text-lg font-bold text-gray-900">Return Item</h2>
+                <p className="text-gray-500 text-xs font-medium mt-0.5">
+                  Order #{returnModal.order?._id.slice(-6).toUpperCase()} - {returnModal.item?.product?.name || returnModal.item?.name}
+                </p>
               </div>
               <button 
-                onClick={() => setReturnModal({ open: false, order: null })}
+                onClick={() => setReturnModal({ open: false, order: null, item: null })}
                 className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-gray-400"
               >
                 <X size={20} />
@@ -726,19 +876,73 @@ export default function OrdersPage({ onNavigate, user }) {
                 </div>
               </div>
 
+              <div className="border-t border-gray-100 pt-4 space-y-4 text-left">
+                <h4 className="text-[10px] font-black text-amber-700 uppercase tracking-widest ml-0.5">Refund Bank Details</h4>
+                
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-wider ml-0.5">Account Holder Name</label>
+                    <input 
+                      type="text"
+                      required
+                      placeholder="Account holder's name"
+                      value={returnForm.refundAccountName}
+                      onChange={(e) => setReturnForm({ ...returnForm, refundAccountName: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:border-amber-500 outline-none transition-all text-xs text-gray-850 font-bold"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-wider ml-0.5">Bank Name</label>
+                    <input 
+                      type="text"
+                      required
+                      placeholder="e.g. HDFC Bank"
+                      value={returnForm.refundBankName}
+                      onChange={(e) => setReturnForm({ ...returnForm, refundBankName: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:border-amber-500 outline-none transition-all text-xs text-gray-850 font-bold"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-wider ml-0.5">Bank Account Number</label>
+                    <input 
+                      type="text"
+                      required
+                      placeholder="Bank account number"
+                      value={returnForm.refundAccountNumber}
+                      onChange={(e) => setReturnForm({ ...returnForm, refundAccountNumber: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:border-amber-500 outline-none transition-all text-xs text-gray-850 font-bold"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-wider ml-0.5">IFSC Code</label>
+                    <input 
+                      type="text"
+                      required
+                      placeholder="e.g. HDFC0000123"
+                      value={returnForm.refundIfscCode}
+                      onChange={(e) => setReturnForm({ ...returnForm, refundIfscCode: e.target.value.toUpperCase() })}
+                      className="w-full px-3 py-2 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:border-amber-500 outline-none transition-all text-xs text-gray-850 font-bold uppercase"
+                    />
+                  </div>
+                </div>
+              </div>
+
               <div className="flex gap-3 pt-2">
                 <button 
                   type="button"
                   disabled={submittingReturn}
-                  onClick={() => setReturnModal({ open: false, order: null })}
+                  onClick={() => setReturnModal({ open: false, order: null, item: null })}
                   className="flex-1 py-3 border border-gray-200 text-gray-600 font-bold rounded-xl hover:bg-gray-50 transition-all text-sm"
                 >
                   Cancel
                 </button>
                 <button 
                   type="submit"
-                  disabled={submittingReturn || !returnForm.selectedReason || !returnForm.image}
-                  className="flex-[2] py-3 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl shadow-lg shadow-amber-500/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:grayscale text-sm"
+                  disabled={submittingReturn || !returnForm.selectedReason || !returnForm.image || !returnForm.refundAccountName.trim() || !returnForm.refundBankName.trim() || !returnForm.refundAccountNumber.trim() || !returnForm.refundIfscCode.trim()}
+                  className="flex-[2] py-3 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl shadow-lg shadow-amber-500/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:grayscale text-sm cursor-pointer"
                 >
                   {submittingReturn ? (
                     <div className="w-5 h-5 border-3 border-white/30 border-t-white rounded-full animate-spin" />

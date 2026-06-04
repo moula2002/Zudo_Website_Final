@@ -37,27 +37,127 @@ export default function PolicyPage({ type, onNavigate }) {
     privacy: {
       title: 'Privacy Policy',
       icon: <Shield className="text-emerald-600" size={32} />,
-      lastUpdated: 'May 07, 2026',
+      lastUpdated: 'June 01, 2026',
       content: [
         {
+          heading: '',
+          text: 'Welcome to Zudo. Your privacy is important to us. This Privacy Policy explains how we collect, use, and protect your information when you use our website and mobile application.'
+        },
+        {
           heading: '1. Information We Collect',
-          text: 'We collect information you provide directly to us, such as when you create an account, place an order, or contact customer support. This includes name, email, phone number, and address.'
+          text: (
+            <div className="space-y-4">
+              <div>
+                <strong className="text-gray-900 block mb-1">a. Personal Information</strong>
+                <ul className="list-disc pl-5 space-y-1">
+                  <li>Name</li>
+                  <li>Email address</li>
+                  <li>Phone number</li>
+                  <li>Shipping and billing address</li>
+                </ul>
+              </div>
+              <div>
+                <strong className="text-gray-900 block mb-1">b. Account Information</strong>
+                <ul className="list-disc pl-5 space-y-1">
+                  <li>Login credentials (if you create an account)</li>
+                </ul>
+              </div>
+              <div>
+                <strong className="text-gray-900 block mb-1">c. Transaction Information</strong>
+                <ul className="list-disc pl-5 space-y-1">
+                  <li>Order details</li>
+                  <li>Payment information (processed securely via third-party payment providers)</li>
+                </ul>
+              </div>
+              <div>
+                <strong className="text-gray-900 block mb-1">d. Device & Usage Information</strong>
+                <ul className="list-disc pl-5 space-y-1">
+                  <li>Device type</li>
+                  <li>IP address</li>
+                  <li>Browser type</li>
+                  <li>App usage data</li>
+                </ul>
+              </div>
+            </div>
+          )
         },
         {
           heading: '2. How We Use Your Information',
-          text: 'We use your information to process orders, provide customer support, send updates, and improve our services. We do not sell your personal data to third parties.'
+          text: (
+            <ul className="list-disc pl-5 space-y-1">
+              <li>Process and deliver your orders</li>
+              <li>Provide customer support</li>
+              <li>Improve our app and services</li>
+              <li>Send order updates and notifications</li>
+              <li>Prevent fraud and enhance security</li>
+            </ul>
+          )
         },
         {
-          heading: '3. Data Security',
-          text: 'We implement industry-standard security measures to protect your personal information. However, no method of transmission over the internet is 100% secure.'
+          heading: '3. Sharing Your Information',
+          text: (
+            <div className="space-y-3">
+              <p>We do not sell your personal data. We may share your information with:</p>
+              <ul className="list-disc pl-5 space-y-1">
+                <li>Payment gateways (to process payments securely)</li>
+                <li>Delivery partners (to ship your orders)</li>
+                <li>Service providers (hosting, analytics, etc.)</li>
+              </ul>
+              <p>These partners are required to keep your information secure.</p>
+            </div>
+          )
         },
         {
-          heading: '4. Cookies',
-          text: 'We use cookies to enhance your browsing experience, remember your preferences, and analyze our traffic. You can manage cookie settings in your browser.'
+          heading: '4. Cookies and Tracking Technologies',
+          text: (
+            <div className="space-y-3">
+              <ul className="list-disc pl-5 space-y-1">
+                <li>Enhance user experience</li>
+                <li>Analyze app and website traffic</li>
+                <li>Remember your preferences</li>
+              </ul>
+              <p>You can disable cookies through your browser settings.</p>
+            </div>
+          )
         },
         {
-          heading: '5. Your Rights',
-          text: 'You have the right to access, update, or delete your personal information at any time through your profile settings or by contacting us.'
+          heading: '5. Data Security',
+          text: 'We take appropriate security measures to protect your data from unauthorized access, alteration, or disclosure.'
+        },
+        {
+          heading: '6. Your Rights',
+          text: (
+            <ul className="list-disc pl-5 space-y-1">
+              <li>Access your personal data</li>
+              <li>Update or correct your information</li>
+              <li>Request deletion of your account</li>
+            </ul>
+          )
+        },
+        {
+          heading: '7. Children’s Privacy',
+          text: 'Zudo does not knowingly collect data from children under 13 years of age. If we become aware of such data, we will delete it.'
+        },
+        {
+          heading: '8. Third-Party Links',
+          text: 'Our app or website may contain links to third-party websites. We are not responsible for their privacy practices.'
+        },
+        {
+          heading: '9. Changes to This Policy',
+          text: 'We may update this Privacy Policy from time to time. Changes will be posted on this page with an updated effective date.'
+        },
+        {
+          heading: '10. Contact Us',
+          text: (
+            <div className="space-y-3">
+              <p>If you have any questions about this Privacy Policy:</p>
+              <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 space-y-1.5 text-sm font-semibold">
+                <p><span className="text-gray-400 font-bold uppercase tracking-wider text-[10px] mr-2">Email:</span> <a href="mailto:snbtrading.co.2024@gmail.com" className="text-emerald-600 hover:underline">snbtrading.co.2024@gmail.com</a></p>
+                <p><span className="text-gray-400 font-bold uppercase tracking-wider text-[10px] mr-2">Phone:</span> <a href="tel:+919876543210" className="text-emerald-600 hover:underline">+91 98765 43210</a></p>
+                <p className="flex items-start"><span className="text-gray-400 font-bold uppercase tracking-wider text-[10px] mr-2 mt-0.5">Address:</span> <span className="text-gray-600 text-left">Bharath nagar, 2nd stage, magadi main road, bangaluru, 560091</span></p>
+              </div>
+            </div>
+          )
         }
       ]
     },
@@ -149,10 +249,10 @@ export default function PolicyPage({ type, onNavigate }) {
           <div className="prose prose-emerald max-w-none space-y-10">
             {policy.content.map((section, idx) => (
               <div key={idx} className="space-y-3">
-                <h2 className="text-xl font-black text-gray-900 tracking-tight">{section.heading}</h2>
-                <p className="text-gray-600 font-medium leading-relaxed text-lg">
+                {section.heading && <h2 className="text-xl font-black text-gray-900 tracking-tight">{section.heading}</h2>}
+                <div className="text-gray-600 font-medium leading-relaxed text-lg">
                   {section.text}
-                </p>
+                </div>
               </div>
             ))}
           </div>

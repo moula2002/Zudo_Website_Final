@@ -35,6 +35,7 @@ export default function HomeNeeds({ onAddToCart, onUpdateQuantity, onToggleWishl
                   onToggleWishlist={onToggleWishlist}
                   isWishlisted={wishlistItems.some(item => item.id === product.id)}
                   quantity={cartItem ? cartItem.quantity : 0}
+                  cartItems={cartItems}
                 />
               </div>
             );

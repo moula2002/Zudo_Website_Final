@@ -73,6 +73,7 @@ export default function NewArrivals({ onAddToCart, onUpdateQuantity, onToggleWis
                 onToggleWishlist={onToggleWishlist}
                 isWishlisted={wishlistItems.some(item => item.id === product.id)}
                 quantity={cartItem ? cartItem.quantity : 0}
+                cartItems={cartItems}
               />
             </div>
           );

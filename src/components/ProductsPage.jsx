@@ -140,6 +140,7 @@ export default function ProductsPage({ searchQuery, initialCategory = 'All', ini
                       onToggleWishlist={onToggleWishlist}
                       isWishlisted={wishlistItems.some(item => item.id === product.id)}
                       quantity={cartItem ? cartItem.quantity : 0}
+                      cartItems={cartItems}
                     />
                   </div>
                 );

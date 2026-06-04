@@ -57,6 +57,8 @@ export default function WishlistPage({ wishlistItems, cartItems = [], onAddToCar
                 onToggleWishlist={onToggleWishlist}
                 isWishlisted={true}
                 quantity={cartItem ? cartItem.quantity : 0}
+                cartItems={cartItems}
+                showRemoveButton={true}
               />
             </div>
           );

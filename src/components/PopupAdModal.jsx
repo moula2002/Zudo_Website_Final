@@ -9,6 +9,12 @@ const PopupAdModal = () => {
   const [closing, setClosing] = useState(false);
 
   useEffect(() => {
+    // Check if ad was already shown in this session to prevent repeating on refresh
+    const adShown = sessionStorage.getItem('zudo_ad_shown');
+    if (adShown === 'true') {
+      return;
+    }
+
     const fetchAds = async () => {
       try {
         const savedCity = localStorage.getItem('selectedCity');
@@ -21,13 +27,17 @@ const PopupAdModal = () => {
             'x-tenant-id': locationHeader
           }
         });
-        const data = await response.json();
-        
-        if (data && data.length > 0) {
-          setAds(data);
-          setTimeout(() => {
-            setIsVisible(true);
-          }, 1500);
+        if (response.ok) {
+          const data = await response.json();
+          if (data && data.length > 0) {
+            setAds(data);
+            setTimeout(() => {
+              setIsVisible(true);
+              sessionStorage.setItem('zudo_ad_shown', 'true');
+            }, 1500);
+          }
+        } else {
+          console.warn('Failed to fetch popup ads: Server returned status', response.status);
         }
       } catch (error) {
         console.error('Failed to fetch popup ads:', error);

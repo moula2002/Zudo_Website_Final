@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { User, Mail, Phone, MapPin, Camera, Save, ArrowLeft, Package, X, AlertTriangle, Search } from 'lucide-react';
+import { User, Mail, Phone, MapPin, Camera, Save, ArrowLeft, Package, X, AlertTriangle, Search, Clock } from 'lucide-react';
 import { useLocation } from '../hooks/useLocation';
-import { API_URL, IMAGE_BASE_URL, cleanImageUrl } from '../config';
+import { API_URL, IMAGE_BASE_URL, cleanImageUrl, UPLOAD_URL } from '../config';
 
 export default function ProfilePage({ user, onUpdateUser, onNavigate, initialTab = 'addresses' }) {
   const [formData, setFormData] = useState({
@@ -86,7 +86,7 @@ export default function ProfilePage({ user, onUpdateUser, onNavigate, initialTab
       const savedTenantId = localStorage.getItem('zudo_tenant_id');
       const locationHeader = savedTenantId || selectedCity || '';
 
-      const response = await fetch(`${IMAGE_BASE_URL}/api/upload`, {
+      const response = await fetch(UPLOAD_URL, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -99,7 +99,7 @@ export default function ProfilePage({ user, onUpdateUser, onNavigate, initialTab
       const data = await response.json();
       if (!response.ok) throw new Error(data.message || 'Upload failed');
 
-      const fullImageUrl = cleanImageUrl(`${IMAGE_BASE_URL}${data.url}`);
+      const fullImageUrl = cleanImageUrl(data.url);
       setFormData(prev => ({ ...prev, profileImage: fullImageUrl }));
       setMessage({ type: 'success', text: 'Image uploaded to cloud! Remember to save changes.' });
     } catch (err) {
@@ -122,7 +122,7 @@ export default function ProfilePage({ user, onUpdateUser, onNavigate, initialTab
       const savedTenantId = localStorage.getItem('zudo_tenant_id');
       const locationHeader = savedTenantId || selectedCity || '';
 
-      const response = await fetch(`${IMAGE_BASE_URL}/api/upload`, {
+      const response = await fetch(UPLOAD_URL, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -135,7 +135,7 @@ export default function ProfilePage({ user, onUpdateUser, onNavigate, initialTab
       const data = await response.json();
       if (!response.ok) throw new Error(data.message || 'Upload failed');
 
-      const fullImageUrl = cleanImageUrl(`${IMAGE_BASE_URL}${data.url}`);
+      const fullImageUrl = cleanImageUrl(data.url);
       setFormData(prev => ({ ...prev, storePic: fullImageUrl }));
       setMessage({ type: 'success', text: 'Banner uploaded! Save changes to finalize.' });
     } catch (err) {
@@ -193,11 +193,170 @@ export default function ProfilePage({ user, onUpdateUser, onNavigate, initialTab
     }
   };
 
+  const isBusiness = user?.role === 'b2b' || user?.role === 'business' || user?.role === 'seller' || user?.role === 'admin' || localStorage.getItem('isB2B') === 'true';
   const [activeTab, setActiveTab] = useState(initialTab); // Use initialTab from props
   const [addresses, setAddresses] = useState(user?.savedAddresses || user?.addresses || []);
   const [showAddressForm, setShowAddressForm] = useState(false);
   const [salesPerson, setSalesPerson] = useState(null);
   const { lat: currentLat, lng: currentLng, city: currentCity, pincode: currentPincode, refresh: refreshLocation, loading: locationLoading } = useLocation();
+
+  // Commissions management state
+  const [commissions, setCommissions] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [commissionsLoading, setCommissionsLoading] = useState(false);
+  const [commissionsMessage, setCommissionsMessage] = useState({ type: '', text: '' });
+  const [commissionForm, setCommissionForm] = useState({
+    id: null,
+    categoryId: '',
+    unit: '',
+    commissionType: 'flat',
+    commissionValue: ''
+  });
+  const [showCommissionForm, setShowCommissionForm] = useState(false);
+
+  const fetchCommissionsAndCategories = async () => {
+    setCommissionsLoading(true);
+    setCommissionsMessage({ type: '', text: '' });
+    try {
+      const selectedCity = localStorage.getItem('selectedCity');
+      const savedTenantId = localStorage.getItem('zudo_tenant_id');
+      const locationHeader = savedTenantId || selectedCity || '';
+
+      const headers = {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'x-location': locationHeader,
+        'x-tenant-id': locationHeader
+      };
+
+      // Fetch commissions
+      const commRes = await fetch(`${API_URL}/commissions`, { headers });
+      if (!commRes.ok) throw new Error('Failed to fetch commission rates');
+      const commData = await commRes.json();
+      setCommissions(commData);
+
+      // Fetch categories
+      const catRes = await fetch(`${API_URL}/categories`, { headers });
+      if (!catRes.ok) throw new Error('Failed to fetch categories');
+      const catData = await catRes.json();
+      setCategories(catData);
+    } catch (err) {
+      console.error('Error loading commissions data:', err);
+      setCommissionsMessage({ type: 'error', text: err.message });
+    } finally {
+      setCommissionsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isBusiness && activeTab === 'commissions') {
+      fetchCommissionsAndCategories();
+    }
+  }, [activeTab, isBusiness]);
+
+  const handleSaveCommission = async (e) => {
+    e.preventDefault();
+    if (!commissionForm.categoryId || !commissionForm.commissionType || commissionForm.commissionValue === '') {
+      setCommissionsMessage({ type: 'error', text: 'Please fill in all required fields' });
+      return;
+    }
+
+    setCommissionsLoading(true);
+    setCommissionsMessage({ type: '', text: '' });
+
+    try {
+      const selectedCity = localStorage.getItem('selectedCity');
+      const savedTenantId = localStorage.getItem('zudo_tenant_id');
+      const locationHeader = savedTenantId || selectedCity || '';
+
+      const headers = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'x-location': locationHeader,
+        'x-tenant-id': locationHeader
+      };
+
+      const url = commissionForm.id 
+        ? `${API_URL}/commissions/${commissionForm.id}` 
+        : `${API_URL}/commissions`;
+      const method = commissionForm.id ? 'PUT' : 'POST';
+
+      const res = await fetch(url, {
+        method,
+        headers,
+        body: JSON.stringify({
+          categoryId: commissionForm.categoryId,
+          unit: commissionForm.unit,
+          commissionType: commissionForm.commissionType,
+          commissionValue: Number(commissionForm.commissionValue)
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Failed to save commission rate');
+
+      setCommissionsMessage({ 
+        type: 'success', 
+        text: commissionForm.id ? 'Commission rate updated successfully!' : 'New commission rate added successfully!' 
+      });
+
+      setCommissionForm({
+        id: null,
+        categoryId: '',
+        unit: '',
+        commissionType: 'flat',
+        commissionValue: ''
+      });
+      setShowCommissionForm(false);
+      fetchCommissionsAndCategories();
+    } catch (err) {
+      setCommissionsMessage({ type: 'error', text: err.message });
+    } finally {
+      setCommissionsLoading(false);
+    }
+  };
+
+  const handleEditCommission = (comm) => {
+    setCommissionForm({
+      id: comm._id || comm.id,
+      categoryId: comm.categoryId?._id || comm.categoryId || '',
+      unit: comm.unit || '',
+      commissionType: comm.commissionType || 'flat',
+      commissionValue: comm.commissionValue
+    });
+    setShowCommissionForm(true);
+  };
+
+  const handleDeleteCommission = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this commission rate?')) return;
+
+    setCommissionsLoading(true);
+    setCommissionsMessage({ type: '', text: '' });
+
+    try {
+      const selectedCity = localStorage.getItem('selectedCity');
+      const savedTenantId = localStorage.getItem('zudo_tenant_id');
+      const locationHeader = savedTenantId || selectedCity || '';
+
+      const res = await fetch(`${API_URL}/commissions/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'x-location': locationHeader,
+          'x-tenant-id': locationHeader
+        }
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Failed to delete commission rate');
+
+      setCommissionsMessage({ type: 'success', text: 'Commission rate deleted successfully!' });
+      fetchCommissionsAndCategories();
+    } catch (err) {
+      setCommissionsMessage({ type: 'error', text: err.message });
+    } finally {
+      setCommissionsLoading(false);
+    }
+  };
 
   useEffect(() => {
     const fetchSalesPerson = async () => {
@@ -246,6 +405,154 @@ export default function ProfilePage({ user, onUpdateUser, onNavigate, initialTab
       setSalesPerson(null);
     }
   }, [user]);
+
+  const [returnsOrders, setReturnsOrders] = useState([]);
+  const [returnsLoading, setReturnsLoading] = useState(false);
+  const [returnsMessage, setReturnsMessage] = useState({ type: '', text: '' });
+  const [returnsActionLoading, setReturnsActionLoading] = useState({});
+  const [returnFilter, setReturnFilter] = useState('All');
+
+  const fetchReturnsOrders = async () => {
+    setReturnsLoading(true);
+    setReturnsMessage({ type: '', text: '' });
+    try {
+      const selectedCity = localStorage.getItem('selectedCity');
+      const savedTenantId = localStorage.getItem('zudo_tenant_id');
+      const locationHeader = savedTenantId || selectedCity || '';
+
+      const res = await fetch(`${API_URL}/orders/admin/all`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'x-location': locationHeader,
+          'x-tenant-id': locationHeader
+        }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Failed to fetch returns');
+      
+      const filtered = data.filter(order => 
+        order.items && order.items.some(item => item.returnStatus && item.returnStatus !== 'None')
+      );
+      setReturnsOrders(filtered);
+    } catch (err) {
+      console.error('Error fetching returns:', err);
+      setReturnsMessage({ type: 'error', text: err.message });
+    } finally {
+      setReturnsLoading(false);
+    }
+  };
+
+  const handleUpdateItemReturnStatus = async (orderId, itemId, newStatus) => {
+    const actionKey = `${orderId}-${itemId}`;
+    setReturnsActionLoading(prev => ({ ...prev, [actionKey]: true }));
+    try {
+      const selectedCity = localStorage.getItem('selectedCity');
+      const savedTenantId = localStorage.getItem('zudo_tenant_id');
+      const locationHeader = savedTenantId || selectedCity || '';
+
+      const res = await fetch(`${API_URL}/orders/${orderId}/items/${itemId}/return-status`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'x-location': locationHeader,
+          'x-tenant-id': locationHeader
+        },
+        body: JSON.stringify({ status: newStatus })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Failed to update return status');
+      
+      // Refresh order in list
+      setReturnsOrders(prev => prev.map(order => 
+        order._id === orderId ? data.order : order
+      ));
+
+      setReturnsMessage({ type: 'success', text: `Item return status successfully updated to "${newStatus}"!` });
+      setTimeout(() => setReturnsMessage({ type: '', text: '' }), 4000);
+    } catch (err) {
+      console.error('Error updating item return status:', err);
+      setReturnsMessage({ type: 'error', text: err.message });
+    } finally {
+      setReturnsActionLoading(prev => ({ ...prev, [actionKey]: false }));
+    }
+  };
+
+  useEffect(() => {
+    if ((user?.role === 'admin' || user?.role === 'seller') && activeTab === 'returns') {
+      fetchReturnsOrders();
+    }
+  }, [activeTab, user]);
+
+  const [cutoffTime, setCutoffTime] = useState('');
+  const [cutoffLoading, setCutoffLoading] = useState(false);
+  const [cutoffMessage, setCutoffMessage] = useState({ type: '', text: '' });
+
+  useEffect(() => {
+    if (isBusiness) {
+      const fetchCutoff = async () => {
+        setCutoffLoading(true);
+        try {
+          const selectedCity = localStorage.getItem('selectedCity');
+          const savedTenantId = localStorage.getItem('zudo_tenant_id');
+          const locationHeader = savedTenantId || selectedCity || '';
+
+          const res = await fetch(`${API_URL}/deliveryslots`, {
+            headers: {
+              'x-location': locationHeader,
+              'x-tenant-id': locationHeader
+            }
+          });
+          if (res.ok) {
+            const slots = await res.json();
+            // Find cutoff settings document (either isSameDay or globalIsSameDay)
+            const cutoffSlot = slots.find(s => (s.isSameDay || s.globalIsSameDay) && s.SameDayCutoff);
+            if (cutoffSlot && cutoffSlot.SameDayCutoff) {
+              setCutoffTime(cutoffSlot.SameDayCutoff);
+            } else {
+              setCutoffTime('12:00 PM');
+            }
+          }
+        } catch (err) {
+          console.error('Error fetching cutoff time:', err);
+        } finally {
+          setCutoffLoading(false);
+        }
+      };
+      fetchCutoff();
+    }
+  }, [user, isBusiness]);
+
+  const handleUpdateCutoff = async (e) => {
+    e.preventDefault();
+    setCutoffLoading(true);
+    setCutoffMessage({ type: '', text: '' });
+    
+    try {
+      const selectedCity = localStorage.getItem('selectedCity');
+      const savedTenantId = localStorage.getItem('zudo_tenant_id');
+      const locationHeader = savedTenantId || selectedCity || '';
+
+      const res = await fetch(`${API_URL}/deliveryslots/cutoff`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'x-location': locationHeader,
+          'x-tenant-id': locationHeader
+        },
+        body: JSON.stringify({ cutoffTime })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Failed to update cutoff');
+      
+      setCutoffMessage({ type: 'success', text: 'Same-day delivery cutoff updated successfully!' });
+    } catch (err) {
+      setCutoffMessage({ type: 'error', text: err.message });
+    } finally {
+      setCutoffLoading(false);
+    }
+  };
 
   const [addressForm, setAddressForm] = useState({
     name: user?.name || '',
@@ -413,6 +720,30 @@ export default function ProfilePage({ user, onUpdateUser, onNavigate, initialTab
           >
             Addresses
           </button>
+          {isBusiness && (
+            <>
+              <button 
+                onClick={() => setActiveTab('delivery_settings')}
+                className={`px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl font-bold transition-all whitespace-nowrap text-sm sm:text-base ${activeTab === 'delivery_settings' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+              >
+                Delivery Settings
+              </button>
+              <button 
+                onClick={() => setActiveTab('commissions')}
+                className={`px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl font-bold transition-all whitespace-nowrap text-sm sm:text-base ${activeTab === 'commissions' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+              >
+                Commissions
+              </button>
+            </>
+          )}
+          {(user?.role === 'admin' || user?.role === 'seller') && (
+            <button 
+              onClick={() => setActiveTab('returns')}
+              className={`px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl font-bold transition-all whitespace-nowrap text-sm sm:text-base ${activeTab === 'returns' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+            >
+              Returns
+            </button>
+          )}
           <button 
             onClick={() => onNavigate('orders')}
             className="flex items-center gap-2 px-4 sm:px-5 py-2 sm:py-2.5 bg-emerald-50 text-emerald-700 rounded-xl font-bold hover:bg-emerald-100 transition-colors whitespace-nowrap text-sm sm:text-base"
@@ -424,7 +755,7 @@ export default function ProfilePage({ user, onUpdateUser, onNavigate, initialTab
       </div>
 
       <div className="bg-white rounded-3xl shadow-xl shadow-gray-200/50 border border-gray-100 overflow-hidden">
-        {activeTab === 'profile' ? (
+        {activeTab === 'profile' && (
           <>
             <div className="relative group h-32 sm:h-40 overflow-hidden">
               {formData.storePic ? (
@@ -669,9 +1000,11 @@ export default function ProfilePage({ user, onUpdateUser, onNavigate, initialTab
                   </div>
                 </form>
               )}
-          </div>
-        </>
-      ) : (
+            </div>
+          </>
+        )}
+
+      {activeTab === 'addresses' && (
         <div className="p-4 sm:p-6 animate-[fadeIn_0.3s_ease-out]">
           <div className="flex items-center justify-between mb-6">
             <div>
@@ -897,6 +1230,496 @@ export default function ProfilePage({ user, onUpdateUser, onNavigate, initialTab
               )}
             </div>
           </div>
+        </div>
+      )}
+
+      {activeTab === 'delivery_settings' && isBusiness && (
+        <div className="p-6 sm:p-8 animate-[fadeIn_0.3s_ease-out]">
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h3 className="text-xl font-black text-gray-900 tracking-tight">Delivery Settings</h3>
+              <p className="text-[11px] text-gray-500 font-bold uppercase tracking-widest mt-1">Configure same-day delivery limits</p>
+            </div>
+            <div className="h-12 w-12 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600 shadow-inner">
+              <Clock size={22} />
+            </div>
+          </div>
+
+          {cutoffMessage.text && (
+            <div className={`mb-6 p-4 rounded-2xl font-black text-[11px] flex items-center gap-3 animate-[scaleIn_0.3s_ease-out] ${cutoffMessage.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-red-50 text-red-600 border border-red-100'}`}>
+              <div className={`w-2.5 h-2.5 rounded-full animate-pulse ${cutoffMessage.type === 'success' ? 'bg-emerald-600 shadow-[0_0_10px_rgba(16,185,129,0.5)]' : 'bg-red-600 shadow-[0_0_10px_rgba(239,68,68,0.5)]'}`}></div>
+              {cutoffMessage.text}
+            </div>
+          )}
+
+          <form onSubmit={handleUpdateCutoff} className="max-w-md space-y-6">
+            <div className="bg-gray-50 p-6 rounded-[2rem] border border-gray-100 space-y-4">
+              <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                Same-Day Delivery Cutoff Time
+              </label>
+              <p className="text-xs text-gray-500 font-bold leading-relaxed">
+                Same-day delivery slots will be automatically hidden or disabled for customers placing orders past this cutoff time.
+              </p>
+              
+              <div className="relative mt-2">
+                <select
+                  value={cutoffTime}
+                  onChange={(e) => setCutoffTime(e.target.value)}
+                  className="w-full px-4 py-3 rounded-2xl border border-gray-200 bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all font-black text-sm text-gray-800 appearance-none cursor-pointer"
+                  required
+                >
+                  <option value="09:00 AM">09:00 AM</option>
+                  <option value="10:00 AM">10:00 AM</option>
+                  <option value="10:30 AM">10:30 AM</option>
+                  <option value="11:00 AM">11:00 AM</option>
+                  <option value="12:00 PM">12:00 PM</option>
+                  <option value="01:00 PM">01:00 PM (13:00)</option>
+                  <option value="02:00 PM">02:00 PM (14:00)</option>
+                  <option value="03:00 PM">03:00 PM (15:00)</option>
+                  <option value="04:00 PM">04:00 PM (16:00)</option>
+                  <option value="05:00 PM">05:00 PM (17:00)</option>
+                </select>
+                <div className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                  <Clock size={16} />
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={cutoffLoading}
+              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-4 rounded-2xl shadow-xl shadow-emerald-600/30 transform hover:-translate-y-0.5 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+            >
+              {cutoffLoading ? (
+                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : (
+                <>
+                  <Save size={18} />
+                  Update Cutoff Time
+                </>
+              )}
+            </button>
+          </form>
+        </div>
+      )}
+
+      {activeTab === 'commissions' && isBusiness && (
+        <div className="p-6 sm:p-8 animate-[fadeIn_0.3s_ease-out]">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+            <div>
+              <h3 className="text-xl font-black text-gray-900 tracking-tight">Category Commissions</h3>
+              <p className="text-[11px] text-gray-500 font-bold uppercase tracking-widest mt-1">Configure flat and percentage based payouts</p>
+            </div>
+            <button
+              onClick={() => {
+                setCommissionForm({
+                  id: null,
+                  categoryId: categories[0]?._id || '',
+                  unit: '',
+                  commissionType: 'flat',
+                  commissionValue: ''
+                });
+                setShowCommissionForm(!showCommissionForm);
+              }}
+              className="py-3 px-6 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-black text-[10px] uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 active:scale-95 border-0"
+            >
+              {showCommissionForm ? 'Close Form' : 'Add Commission'}
+            </button>
+          </div>
+
+          {commissionsMessage.text && (
+            <div className={`mb-6 p-4 rounded-2xl font-black text-[11px] flex items-center gap-3 animate-[scaleIn_0.3s_ease-out] ${commissionsMessage.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-red-50 text-red-600 border border-red-100'}`}>
+              <div className={`w-2.5 h-2.5 rounded-full animate-pulse ${commissionsMessage.type === 'success' ? 'bg-emerald-600 shadow-[0_0_10px_rgba(16,185,129,0.5)]' : 'bg-red-600 shadow-[0_0_10px_rgba(239,68,68,0.5)]'}`}></div>
+              {commissionsMessage.text}
+            </div>
+          )}
+
+          {showCommissionForm && (
+            <form onSubmit={handleSaveCommission} className="bg-gray-50/50 p-6 rounded-[2rem] border border-gray-100 space-y-4 mb-8 animate-[slideDown_0.3s_ease-out]">
+              <h4 className="text-[10px] font-black text-gray-900 uppercase tracking-widest mb-2">
+                {commissionForm.id ? 'Edit Commission Rate' : 'New Commission Rate'}
+              </h4>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black text-gray-900 uppercase tracking-[0.1em] ml-1">Category</label>
+                  <select
+                    value={commissionForm.categoryId}
+                    onChange={(e) => setCommissionForm({ ...commissionForm, categoryId: e.target.value })}
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-100 bg-white focus:border-emerald-500 outline-none transition-all font-bold text-gray-800 text-xs cursor-pointer"
+                    required
+                  >
+                    <option value="" disabled>Select Category</option>
+                    {categories.map(cat => (
+                      <option key={cat._id} value={cat._id}>{cat.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black text-gray-900 uppercase tracking-[0.1em] ml-1">Unit (e.g. Pc, Kg, Ltr)</label>
+                  <input
+                    type="text"
+                    value={commissionForm.unit}
+                    onChange={(e) => setCommissionForm({ ...commissionForm, unit: e.target.value })}
+                    placeholder="Optional (e.g. Pc)"
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-100 bg-white focus:border-emerald-500 outline-none transition-all font-bold text-gray-800 text-xs"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black text-gray-900 uppercase tracking-[0.1em] ml-1">Type</label>
+                  <select
+                    value={commissionForm.commissionType}
+                    onChange={(e) => setCommissionForm({ ...commissionForm, commissionType: e.target.value })}
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-100 bg-white focus:border-emerald-500 outline-none transition-all font-bold text-gray-800 text-xs cursor-pointer"
+                    required
+                  >
+                    <option value="flat">Flat (Fixed amount)</option>
+                    <option value="percentage">Percentage (%)</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black text-gray-900 uppercase tracking-[0.1em] ml-1">
+                    Value {commissionForm.commissionType === 'flat' ? '(₹)' : '(%)'}
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={commissionForm.commissionValue}
+                    onChange={(e) => setCommissionForm({ ...commissionForm, commissionValue: e.target.value })}
+                    placeholder={commissionForm.commissionType === 'flat' ? 'e.g. 30' : 'e.g. 10'}
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-100 bg-white focus:border-emerald-500 outline-none transition-all font-bold text-gray-800 text-xs"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-2 justify-end pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowCommissionForm(false)}
+                  className="px-6 py-2.5 border border-gray-100 text-gray-400 rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-gray-100 transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={commissionsLoading}
+                  className="px-8 py-2.5 bg-emerald-600 text-white rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-md shadow-emerald-600/10 active:scale-95"
+                >
+                  {commissionForm.id ? 'Update Rate' : 'Add Rate'}
+                </button>
+              </div>
+            </form>
+          )}
+
+          {commissionsLoading && commissions.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20">
+              <div className="w-10 h-10 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin mb-4" />
+              <p className="text-gray-400 font-bold text-xs uppercase tracking-widest">Loading commissions settings...</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-3xl border border-gray-100 shadow-sm">
+              <table className="w-full border-collapse bg-white text-left text-xs text-gray-500">
+                <thead className="bg-gray-50 text-[10px] font-black uppercase tracking-wider text-gray-400">
+                  <tr>
+                    <th scope="col" className="px-6 py-4">Category</th>
+                    <th scope="col" className="px-6 py-4">Unit Limit</th>
+                    <th scope="col" className="px-6 py-4">Commission Type</th>
+                    <th scope="col" className="px-6 py-4">Rate Value</th>
+                    <th scope="col" className="px-6 py-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50 border-t border-gray-50 font-medium">
+                  {commissions.length > 0 ? (
+                    commissions.map((comm) => (
+                      <tr key={comm._id || comm.id} className="hover:bg-gray-50/50 transition-colors">
+                        <td className="px-6 py-4">
+                          <div className="flex flex-col">
+                            <span className="font-black text-gray-900 text-xs">
+                              {comm.categoryId?.name || comm.categoryId || 'General Category'}
+                            </span>
+                            <span className="text-[9px] text-gray-400 uppercase tracking-tighter mt-0.5">
+                              ID: {comm.categoryId?._id || comm.categoryId}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider ${comm.unit ? 'bg-blue-50 text-blue-700 border border-blue-100' : 'bg-gray-100 text-gray-400'}`}>
+                            {comm.unit || 'Universal (Any)'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider ${comm.commissionType === 'flat' ? 'bg-amber-50 text-amber-700 border border-amber-100' : 'bg-teal-50 text-teal-700 border border-teal-100'}`}>
+                            {comm.commissionType === 'flat' ? 'Flat Fee' : 'Percentage'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 font-black text-gray-900 text-sm">
+                          {comm.commissionType === 'flat' ? `₹${comm.commissionValue}` : `${comm.commissionValue}%`}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <div className="flex justify-end gap-3">
+                            <button
+                              onClick={() => handleEditCommission(comm)}
+                              className="text-[9px] font-black text-emerald-600 uppercase tracking-widest hover:underline border-0 bg-transparent cursor-pointer"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handleDeleteCommission(comm._id || comm.id)}
+                              className="text-[9px] font-black text-red-500 uppercase tracking-widest hover:underline border-0 bg-transparent cursor-pointer"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan="5" className="text-center py-16 bg-gray-50/50">
+                        <div className="h-12 w-12 bg-white rounded-xl shadow-sm flex items-center justify-center mx-auto mb-3">
+                          💸
+                        </div>
+                        <p className="text-gray-400 font-bold italic">No commission rates defined yet.</p>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'returns' && (user?.role === 'admin' || user?.role === 'seller') && (
+        <div className="p-6 sm:p-8 animate-[fadeIn_0.3s_ease-out]">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+            <div>
+              <h3 className="text-xl font-black text-gray-900 tracking-tight text-left">Returns Management</h3>
+              <p className="text-[11px] text-gray-500 font-bold uppercase tracking-widest mt-1 text-left">Review and process customer product return requests</p>
+            </div>
+            <div className="h-12 w-12 bg-amber-50 rounded-2xl flex items-center justify-center text-amber-600 shadow-inner">
+              <ArrowLeft size={22} className="rotate-180" />
+            </div>
+          </div>
+
+          {returnsMessage.text && (
+            <div className={`mb-6 p-4 rounded-2xl font-black text-[11px] flex items-center gap-3 animate-[scaleIn_0.3s_ease-out] ${returnsMessage.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-red-50 text-red-600 border border-red-100'}`}>
+              <div className={`w-2.5 h-2.5 rounded-full animate-pulse ${returnsMessage.type === 'success' ? 'bg-emerald-600 shadow-[0_0_10px_rgba(16,185,129,0.5)]' : 'bg-red-600 shadow-[0_0_10px_rgba(239,68,68,0.5)]'}`}></div>
+              {returnsMessage.text}
+            </div>
+          )}
+
+          {/* Filter Tabs */}
+          <div className="flex gap-2 overflow-x-auto pb-3 mb-6 scrollbar-hide">
+            {['All', 'Return Requested', 'Return Approved', 'Picked Up from Customer', 'Returned to Seller', 'Return Rejected'].map(status => (
+              <button
+                key={status}
+                type="button"
+                onClick={() => setReturnFilter(status)}
+                className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border whitespace-nowrap ${returnFilter === status ? 'bg-amber-500 border-amber-500 text-white shadow-lg shadow-amber-500/20' : 'bg-gray-50 border-gray-100 text-gray-500 hover:bg-gray-100'}`}
+              >
+                {status === 'All' ? 'All Returns' : status}
+              </button>
+            ))}
+          </div>
+
+          {returnsLoading ? (
+            <div className="flex flex-col items-center justify-center py-20">
+              <div className="w-10 h-10 border-4 border-amber-500/20 border-t-amber-500 rounded-full animate-spin mb-4" />
+              <p className="text-gray-400 font-bold text-xs uppercase tracking-widest">Loading return requests...</p>
+            </div>
+          ) : (() => {
+            // Filter orders based on returnFilter
+            const filteredOrders = returnsOrders.filter(order => {
+              if (returnFilter === 'All') return true;
+              return order.items.some(item => item.returnStatus === returnFilter);
+            });
+
+            if (filteredOrders.length === 0) {
+              return (
+                <div className="text-center py-20 bg-gray-50 rounded-[2.5rem] border-2 border-dashed border-gray-100">
+                  <div className="h-16 w-16 bg-white rounded-xl shadow-sm flex items-center justify-center mx-auto mb-3 text-2xl">
+                    📦
+                  </div>
+                  <p className="text-gray-400 font-bold italic">No return requests found matching the filter.</p>
+                </div>
+              );
+            }
+
+            return (
+              <div className="space-y-6">
+                {filteredOrders.map(order => (
+                  <div key={order._id} className="bg-white rounded-[2.5rem] border border-gray-100 shadow-xl overflow-hidden text-left hover:border-amber-200/50 transition-all duration-300">
+                    {/* Header */}
+                    <div className="bg-gray-50/50 px-6 py-4 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      <div>
+                        <span className="text-[10px] font-black text-amber-600 bg-amber-50 px-2.5 py-1 rounded-md border border-amber-100 uppercase tracking-widest">
+                          Order ID: #{order._id.slice(-6).toUpperCase()}
+                        </span>
+                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tight ml-3">
+                          Placed: {new Date(order.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-xs font-black text-gray-500 uppercase">Customer: </span>
+                        <span className="text-xs font-black text-gray-900">{order.userId?.name || 'Unknown'}</span>
+                        <span className="text-[10px] text-gray-400 ml-2">({order.userId?.email})</span>
+                      </div>
+                    </div>
+
+                    {/* Return Items list */}
+                    <div className="p-6 space-y-6">
+                      {order.items
+                        .filter(item => item.returnStatus && item.returnStatus !== 'None' && (returnFilter === 'All' || item.returnStatus === returnFilter))
+                        .map((item, idx) => {
+                          const actionKey = `${order._id}-${item._id}`;
+                          const isLoading = !!returnsActionLoading[actionKey];
+
+                          return (
+                            <div key={item._id || idx} className="flex flex-col lg:flex-row lg:items-start justify-between gap-6 pb-6 border-b border-gray-50 last:border-b-0 last:pb-0">
+                              {/* Left: Item metadata & details */}
+                              <div className="flex gap-4 items-start flex-1 min-w-0">
+                                <div className="w-16 h-16 rounded-xl bg-gray-50 overflow-hidden border border-gray-100 flex-shrink-0">
+                                  <img src={cleanImageUrl(item.product?.imageUrl || item.product?.image || item.image)} alt={item.name} className="w-full h-full object-cover" />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <h4 className="font-black text-gray-900 text-sm truncate leading-tight mb-1">{item.product?.name || item.name}</h4>
+                                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest font-mono mb-2">
+                                    Qty: {item.quantity} × ₹{item.price}
+                                  </p>
+                                  
+                                  <div className="bg-amber-50/50 border border-amber-100/50 rounded-xl p-3.5 space-y-2 mt-2">
+                                    <p className="text-[10px] font-black text-amber-700 uppercase tracking-wider leading-none">Return Details</p>
+                                    <p className="text-xs font-bold text-gray-700 leading-tight mt-1">
+                                      <span className="text-amber-800">Reason:</span> {item.returnReason || 'Not provided'}
+                                    </p>
+                                    {item.returnComment && (
+                                      <p className="text-xs font-medium text-gray-600 leading-tight">
+                                        <span className="text-amber-800">Comment:</span> {item.returnComment}
+                                      </p>
+                                    )}
+                                    {item.returnImage && (
+                                      <div className="pt-2">
+                                        <p className="text-[9px] font-black text-amber-800 uppercase tracking-wide mb-1">Evidence Photo:</p>
+                                        <a href={cleanImageUrl(item.returnImage)} target="_blank" rel="noopener noreferrer" className="inline-block relative rounded-lg overflow-hidden border border-amber-100 hover:scale-[1.02] transition-transform">
+                                          <img src={cleanImageUrl(item.returnImage)} alt="Evidence" className="h-20 w-32 object-cover" />
+                                        </a>
+                                      </div>
+                                    )}
+                                    {(item.refundAccountName || item.refundBankName || item.refundAccountNumber || item.refundIfscCode) && (
+                                      <div className="pt-2 border-t border-amber-200/40 mt-2 space-y-1">
+                                        <p className="text-[9px] font-black text-amber-800 uppercase tracking-wider leading-none">Refund Bank Details</p>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs pt-1">
+                                          {item.refundAccountName && (
+                                            <p className="font-bold text-gray-700">
+                                              <span className="text-amber-800 text-[10px] uppercase font-black tracking-wider mr-1">Holder Name:</span> {item.refundAccountName}
+                                            </p>
+                                          )}
+                                          {item.refundBankName && (
+                                            <p className="font-bold text-gray-700">
+                                              <span className="text-amber-800 text-[10px] uppercase font-black tracking-wider mr-1">Bank Name:</span> {item.refundBankName}
+                                            </p>
+                                          )}
+                                          {item.refundAccountNumber && (
+                                            <p className="font-bold text-gray-700">
+                                              <span className="text-amber-800 text-[10px] uppercase font-black tracking-wider mr-1">Account No:</span> {item.refundAccountNumber}
+                                            </p>
+                                          )}
+                                          {item.refundIfscCode && (
+                                            <p className="font-bold text-gray-700">
+                                              <span className="text-amber-800 text-[10px] uppercase font-black tracking-wider mr-1">IFSC Code:</span> {item.refundIfscCode}
+                                            </p>
+                                          )}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Right: Item Return Status & Actions */}
+                              <div className="flex flex-col items-end gap-3 justify-start min-w-[200px] flex-shrink-0">
+                                <div>
+                                  <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 text-right">Return Status</p>
+                                  <span className={`inline-block px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                                    item.returnStatus === 'Return Requested' ? 'bg-amber-100 text-amber-800 border border-amber-200' :
+                                    item.returnStatus === 'Return Approved' ? 'bg-blue-100 text-blue-800 border border-blue-200' :
+                                    item.returnStatus === 'Return Rejected' ? 'bg-red-100 text-red-800 border border-red-200' :
+                                    item.returnStatus === 'Picked Up from Customer' ? 'bg-indigo-100 text-indigo-800 border border-indigo-200' :
+                                    'bg-purple-100 text-purple-800 border border-purple-200'
+                                  }`}>
+                                    {item.returnStatus}
+                                  </span>
+                                </div>
+
+                                {/* Actions Buttons */}
+                                <div className="w-full flex flex-col gap-2 mt-2">
+                                  {item.returnStatus === 'Return Requested' && (
+                                    <div className="flex gap-2 w-full">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleUpdateItemReturnStatus(order._id, item._id, 'Return Approved')}
+                                        disabled={isLoading}
+                                        className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-[9px] uppercase tracking-widest transition-all shadow-md shadow-emerald-600/10 flex items-center justify-center gap-1 cursor-pointer"
+                                      >
+                                        {isLoading ? (
+                                          <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                        ) : 'Approve'}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleUpdateItemReturnStatus(order._id, item._id, 'Return Rejected')}
+                                        disabled={isLoading}
+                                        className="flex-1 py-2 bg-red-50 hover:bg-red-600 text-red-600 hover:text-white rounded-xl font-black text-[9px] uppercase tracking-widest transition-all border border-red-100 flex items-center justify-center gap-1 cursor-pointer"
+                                      >
+                                        {isLoading ? (
+                                          <div className="w-3.5 h-3.5 border-2 border-red-600/30 border-t-red-600 rounded-full animate-spin" />
+                                        ) : 'Reject'}
+                                      </button>
+                                    </div>
+                                  )}
+
+                                  {item.returnStatus === 'Return Approved' && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleUpdateItemReturnStatus(order._id, item._id, 'Picked Up from Customer')}
+                                      disabled={isLoading}
+                                      className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-black text-[9px] uppercase tracking-widest transition-all shadow-md shadow-indigo-600/10 flex items-center justify-center gap-1 cursor-pointer"
+                                    >
+                                      {isLoading ? (
+                                        <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                      ) : 'Mark as Picked Up'}
+                                    </button>
+                                  )}
+
+                                  {item.returnStatus === 'Picked Up from Customer' && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleUpdateItemReturnStatus(order._id, item._id, 'Returned to Seller')}
+                                      disabled={isLoading}
+                                      className="w-full py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-black text-[9px] uppercase tracking-widest transition-all shadow-md shadow-purple-600/10 flex items-center justify-center gap-1 cursor-pointer"
+                                    >
+                                      {isLoading ? (
+                                        <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                      ) : 'Mark as Returned to Seller'}
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
         </div>
       )}
       </div>

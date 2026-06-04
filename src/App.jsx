@@ -38,8 +38,36 @@ const SUPPORTED_MAPPING = {
 
 function App() {
   const [currentPage, setCurrentPage] = useState('home');
-  const [cartItems, setCartItems] = useState([]);
-  const [wishlistItems, setWishlistItems] = useState([]);
+  const [cartItems, setCartItems] = useState(() => {
+    const savedCart = localStorage.getItem('zudo_cart_items');
+    if (savedCart) {
+      try {
+        return JSON.parse(savedCart);
+      } catch (e) {
+        console.error('Failed to parse saved cart items');
+      }
+    }
+    return [];
+  });
+  const [wishlistItems, setWishlistItems] = useState(() => {
+    const savedWishlist = localStorage.getItem('zudo_wishlist_items');
+    if (savedWishlist) {
+      try {
+        return JSON.parse(savedWishlist);
+      } catch (e) {
+        console.error('Failed to parse saved wishlist items');
+      }
+    }
+    return [];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('zudo_cart_items', JSON.stringify(cartItems));
+  }, [cartItems]);
+
+  useEffect(() => {
+    localStorage.setItem('zudo_wishlist_items', JSON.stringify(wishlistItems));
+  }, [wishlistItems]);
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -333,33 +361,87 @@ function App() {
     setCurrentPage('home');
   };
 
-  const addToCart = (product) => {
-    const initialQty = 1;
+  const addToCart = (product, selectedVariant = null) => {
+    let varInfo = {};
+    const variantsList = isB2B ? product.b2b : product.b2c;
+    
+    if (selectedVariant) {
+      varInfo = {
+        selectedPacketSize: selectedVariant.packetSize,
+        price: selectedVariant.price,
+        mrp: selectedVariant.mrp || selectedVariant.price,
+        stock: selectedVariant.stock !== undefined ? selectedVariant.stock : product.stock,
+        gstPercent: selectedVariant.gstPercent || product.gstPercent || 0
+      };
+    } else if (variantsList && variantsList.length > 0) {
+      const defaultVar = variantsList[0];
+      varInfo = {
+        selectedPacketSize: defaultVar.packetSize,
+        price: defaultVar.price,
+        mrp: defaultVar.mrp || defaultVar.price,
+        stock: defaultVar.stock !== undefined ? defaultVar.stock : product.stock,
+        gstPercent: defaultVar.gstPercent || product.gstPercent || 0
+      };
+    } else {
+      varInfo = {
+        selectedPacketSize: product.unit || '1 unit',
+        price: isB2B ? (product.b2bPrice || product.price) : product.price,
+        mrp: product.oldPrice || (isB2B ? (product.b2bPrice || product.price) : product.price),
+        stock: product.stock,
+        gstPercent: product.gstPercent || 0
+      };
+    }
+
+    const maxStock = varInfo.stock !== undefined ? Number(varInfo.stock) : Infinity;
+    if (maxStock <= 0) {
+      showToast(`Sorry, ${product.name} (${varInfo.selectedPacketSize}) is currently out of stock.`);
+      return;
+    }
+
+    const cartKey = `${product.id}_${varInfo.selectedPacketSize}`;
+
     setCartItems(prev => {
-      const existing = prev.find(item => item.id === product.id);
+      const existing = prev.find(item => item.cartKey === cartKey);
       if (existing) {
-        return prev; // Do nothing if already in cart
+        return prev;
       }
-      return [...prev, { ...product, quantity: initialQty }];
+      return [...prev, { 
+        ...product, 
+        cartKey, 
+        selectedPacketSize: varInfo.selectedPacketSize,
+        price: varInfo.price,
+        oldPrice: varInfo.mrp,
+        stock: varInfo.stock,
+        gstPercent: varInfo.gstPercent,
+        quantity: isB2B ? (product.moq || 1) : 1 
+      }];
     });
     
-    const isExisting = cartItems.some(i => i.id === product.id);
-    if (!isExisting) {
-      showToast(`${product.name} added to cart!`);
-    }
+    showToast(`${product.name} (${varInfo.selectedPacketSize}) added to cart!`);
   };
 
-  const updateCartQuantity = (id, delta) => {
+  const updateCartQuantity = (cartKey, delta) => {
     setCartItems(prev => prev.map(item => {
-      if (item.id === id) {
+      // Support matching by cartKey or original id for fallback
+      if (item.cartKey === cartKey || item.id === cartKey) {
         const newQty = item.quantity + delta;
+        const maxStock = item.stock !== undefined ? Number(item.stock) : Infinity;
+        if (newQty > maxStock) {
+          showToast(`Sorry, only ${maxStock} items available in stock.`);
+          return item; 
+        }
+        const minQty = isB2B ? (item.moq || 1) : 1;
+        if (newQty < minQty && delta < 0) {
+          showToast(`Minimum order quantity for wholesale is ${minQty}.`);
+          return item;
+        }
         return { ...item, quantity: Math.max(0, newQty) };
       }
       return item;
     }).filter(item => item.quantity > 0));
   };
 
-  const removeFromCart = (id) => setCartItems(prev => prev.filter(item => item.id !== id));
+  const removeFromCart = (cartKey) => setCartItems(prev => prev.filter(item => item.cartKey !== cartKey && item.id !== cartKey));
   const toggleWishlist = (product) => {
     setWishlistItems(prev => {
       const existing = prev.find(item => item.id === product.id);
@@ -386,13 +468,38 @@ function App() {
   const navigateToProduct = (product) => { setSelectedProduct(product); setCurrentPage('productDetails'); };
 
   const getDisplayPrice = (product) => {
-    const basePrice = product.b2bPrice || product.price;
+    const variantsList = isB2B ? product.b2b : product.b2c;
+    
+    if (variantsList && variantsList.length > 0) {
+      const defaultVar = variantsList[0];
+      return { 
+        price: `₹${defaultVar.price}`, 
+        oldPrice: defaultVar.mrp,
+        isB2B: isB2B,
+        packetSize: defaultVar.packetSize,
+        stock: defaultVar.stock,
+        gstPercent: defaultVar.gstPercent || product.gstPercent || 0
+      };
+    }
+    
+    const basePrice = isB2B ? (product.b2bPrice || product.price) : product.price;
     return { 
       price: `₹${basePrice}`, 
       oldPrice: product.oldPrice,
-      isB2B: false 
+      isB2B: isB2B,
+      packetSize: product.unit || '1 unit',
+      stock: product.stock,
+      gstPercent: product.gstPercent || 0
     };
   };
+
+  const filteredProducts = allProducts.filter(p => {
+    if (isB2B) {
+      return (p.b2b && p.b2b.length > 0) || p.b2bPrice > 0;
+    } else {
+      return (p.b2c && p.b2c.length > 0) || p.price > 0;
+    }
+  });
 
   // Strict Location Gateway check - Persists once verified
   const isLocationSet = localStorage.getItem('selectedCity') && localStorage.getItem('zudo_tenant_id');
@@ -429,7 +536,7 @@ function App() {
         user={user}
         categories={categories}
         subcategories={subcategories}
-        allProducts={allProducts}
+        allProducts={filteredProducts}
         onLogout={handleLogout}
         isDarkMode={isDarkMode}
         toggleTheme={toggleTheme}
@@ -465,10 +572,10 @@ function App() {
                 </div>
                 <TopCategories onNavigate={handleNavigate} onCategoryClick={handleCategoryClick} categories={categories} />
                 <Showcase />
-                <NewArrivals onAddToCart={addToCart} onUpdateQuantity={updateCartQuantity} onToggleWishlist={toggleWishlist} cartItems={cartItems} wishlistItems={wishlistItems} onNavigateToProduct={navigateToProduct} onNavigate={handleNavigate} isB2B={isB2B} getDisplayPrice={getDisplayPrice} allProducts={allProducts} />
-                <HomeProducts onAddToCart={addToCart} onUpdateQuantity={updateCartQuantity} onToggleWishlist={toggleWishlist} cartItems={cartItems} wishlistItems={wishlistItems} onNavigateToProduct={navigateToProduct} onNavigate={handleNavigate} isB2B={isB2B} getDisplayPrice={getDisplayPrice} allProducts={allProducts} />
+                <NewArrivals onAddToCart={addToCart} onUpdateQuantity={updateCartQuantity} onToggleWishlist={toggleWishlist} cartItems={cartItems} wishlistItems={wishlistItems} onNavigateToProduct={navigateToProduct} onNavigate={handleNavigate} isB2B={isB2B} getDisplayPrice={getDisplayPrice} allProducts={filteredProducts} />
+                <HomeProducts onAddToCart={addToCart} onUpdateQuantity={updateCartQuantity} onToggleWishlist={toggleWishlist} cartItems={cartItems} wishlistItems={wishlistItems} onNavigateToProduct={navigateToProduct} onNavigate={handleNavigate} isB2B={isB2B} getDisplayPrice={getDisplayPrice} allProducts={filteredProducts} />
                 <PromoBanner onNavigate={handleNavigate} />
-                <HomeNeeds onAddToCart={addToCart} onUpdateQuantity={updateCartQuantity} onToggleWishlist={toggleWishlist} cartItems={cartItems} wishlistItems={wishlistItems} onNavigateToProduct={navigateToProduct} onNavigate={handleNavigate} isB2B={isB2B} getDisplayPrice={getDisplayPrice} allProducts={allProducts} />
+                <HomeNeeds onAddToCart={addToCart} onUpdateQuantity={updateCartQuantity} onToggleWishlist={toggleWishlist} cartItems={cartItems} wishlistItems={wishlistItems} onNavigateToProduct={navigateToProduct} onNavigate={handleNavigate} isB2B={isB2B} getDisplayPrice={getDisplayPrice} allProducts={filteredProducts} />
                 <Testimonials />
               </>
             )}
@@ -486,7 +593,7 @@ function App() {
                 onNavigateToProduct={navigateToProduct}
                 isB2B={isB2B}
                 getDisplayPrice={getDisplayPrice}
-                allProducts={allProducts}
+                allProducts={filteredProducts}
                 categories={categories}
                 subcategories={subcategories}
               />
@@ -503,7 +610,7 @@ function App() {
                 wishlistItems={wishlistItems}
                 cartItems={cartItems}
                 onUpdateQuantity={updateCartQuantity}
-                allProducts={allProducts}
+                allProducts={filteredProducts}
                 isB2B={isB2B}
                 getDisplayPrice={getDisplayPrice}
                 user={user}
@@ -517,7 +624,7 @@ function App() {
             {currentPage === 'orders' && <OrdersPage onNavigate={handleNavigate} user={user} />}
             {currentPage === 'feeds' && (
               <FeedsPage 
-                allProducts={allProducts}
+                allProducts={filteredProducts}
                 onAddToCart={addToCart}
                 onUpdateQuantity={updateCartQuantity}
                 onToggleWishlist={toggleWishlist}

@@ -26,6 +26,44 @@ const orderSchema = new mongoose.Schema({
     },
     image: String,
     sellerName: String,
+    selectedPacketSize: String,
+    isReturned: {
+      type: Boolean,
+      default: false
+    },
+    returnStatus: {
+      type: String,
+      enum: ['None', 'Return Requested', 'Return Approved', 'Return Rejected', 'Picked Up from Customer', 'Returned to Seller'],
+      default: 'None'
+    },
+    returnReason: {
+      type: String,
+      default: null
+    },
+    returnImage: {
+      type: String,
+      default: null
+    },
+    returnComment: {
+      type: String,
+      default: null
+    },
+    refundAccountName: {
+      type: String,
+      default: null
+    },
+    refundBankName: {
+      type: String,
+      default: null
+    },
+    refundAccountNumber: {
+      type: String,
+      default: null
+    },
+    refundIfscCode: {
+      type: String,
+      default: null
+    },
     // Add nested product for frontend compatibility
     product: {
       name: String,
@@ -58,7 +96,7 @@ const orderSchema = new mongoose.Schema({
   },
   orderStatus: {
     type: String,
-    enum: ['Pending', 'Processing', 'Shipped', 'Out for Delivery', 'Delivered', 'Cancelled', 'Returned'],
+    enum: ['Pending', 'Processing', 'Shipped', 'Out for Delivery', 'Delivered', 'Cancelled', 'Returned', 'Partially Returned', 'Return Requested', 'Return Driver Assigned', 'Out for Return'],
     default: 'Processing'
   },
   deliveryOtp: {

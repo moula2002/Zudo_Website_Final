@@ -43,6 +43,7 @@ const PopupAd = require('./models/PopupAd');
 const FeedPost = require('./models/FeedPost');
 const Sales = require('./models/Sales');
 const DeliverySlot = require('./models/DeliverySlot');
+const Commission = require('./models/Commission');
 
 const storage = require('./utils/context');
 
@@ -130,7 +131,8 @@ const setDynamicDB = (req, res, next) => {
       { name: 'PopupAd', model: PopupAd },
       { name: 'FeedPost', model: FeedPost },
       { name: 'Sales', model: Sales },
-      { name: 'DeliverySlot', model: DeliverySlot }
+      { name: 'DeliverySlot', model: DeliverySlot },
+      { name: 'Commission', model: Commission }
     ];
 
     modelsToRegister.forEach(m => {
@@ -188,6 +190,7 @@ mongoose.connect(process.env.MONGODB_URI)
     app.use('/api/feedposts', require('./routes/feedposts'));
     app.use('/api/sales', require('./routes/sales'));
     app.use('/api/deliveryslots', require('./routes/deliverySlots'));
+    app.use('/api/commissions', require('./routes/commissions'));
 
     // Base route
     app.get('/', (req, res) => {

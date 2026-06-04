@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ShieldCheck, Clock, FileText, ArrowRight, CheckCircle2, X, Upload, FileUp, AlertCircle, Camera, CreditCard } from 'lucide-react';
-import { API_URL, IMAGE_BASE_URL, cleanImageUrl } from '../config';
+import { API_URL, IMAGE_BASE_URL, cleanImageUrl, UPLOAD_URL } from '../config';
 
 export default function B2BVerificationScreen({ onSkip, onBack, user, onUpdateUser }) {
   const [uploading, setUploading] = useState({ doc: false, store: false, submitting: false });
@@ -39,7 +39,7 @@ export default function B2BVerificationScreen({ onSkip, onBack, user, onUpdateUs
       const savedTenantId = localStorage.getItem('zudo_tenant_id');
       const locationHeader = savedTenantId || selectedCity || '';
 
-      const response = await fetch(`${IMAGE_BASE_URL}/api/upload`, {
+      const response = await fetch(UPLOAD_URL, {
         method: 'POST',
         headers: {
           'x-location': locationHeader,
@@ -51,7 +51,7 @@ export default function B2BVerificationScreen({ onSkip, onBack, user, onUpdateUs
       const data = await response.json();
       if (!response.ok) throw new Error(data.message || 'Upload failed');
 
-      const savedUrl = cleanImageUrl(`${IMAGE_BASE_URL}${data.url}`);
+      const savedUrl = cleanImageUrl(data.url);
       console.log(`STEP 2: Received HOSTINGER URL:`, savedUrl);
 
       if (type === 'doc') setDocUrl(savedUrl);

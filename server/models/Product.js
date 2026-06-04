@@ -14,7 +14,32 @@ const productSchema = new mongoose.Schema({
   sellerName:{type:String, default: 'Zudo Official'},
   description:{ type: String },
   pdfUrl: { type: String },
-  rating: { type: Number, default: 0 }
+  rating: { type: Number, default: 0 },
+  stock: { type: Number, default: 0 },
+  gstPercent: { type: Number, default: 0 },
+  priceTiers: [
+    {
+      minQty: { type: Number, required: true },
+      price: { type: Number, required: true }
+    }
+  ],
+  b2b: [
+    {
+      packetSize: { type: String, required: true },
+      mrp: { type: Number, required: true },
+      price: { type: Number, required: true },
+      stock: { type: Number, default: 0 }
+    }
+  ],
+  b2c: [
+    {
+      packetSize: { type: String, required: true },
+      mrp: { type: Number, required: true },
+      price: { type: Number, required: true },
+      stock: { type: Number, default: 0 }
+    }
+  ],
+  variants: [mongoose.Schema.Types.Mixed]
 }, { timestamps: true });
 
 module.exports = new Proxy(function() {}, {
