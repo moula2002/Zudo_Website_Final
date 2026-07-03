@@ -24,7 +24,16 @@ export default function CheckoutPage({ cartItems, onNavigate, user, onOrderSucce
             'x-tenant-id': locationHeader
           }
         });
-        if (!res.ok) throw new Error('Failed to fetch delivery slots');
+
+        if (!res.ok) {
+          if (res.status === 404) {
+            console.warn('Delivery slots endpoint not found on backend. Defaulting to standard delivery.');
+            setDeliverySlots([]);
+            return;
+          }
+          throw new Error('Failed to fetch delivery slots');
+        }
+
         const data = await res.json();
         setDeliverySlots(data);
       } catch (err) {
@@ -53,6 +62,7 @@ export default function CheckoutPage({ cartItems, onNavigate, user, onOrderSucce
   const [placedOrder, setPlacedOrder] = useState(null);
   const [showSaved, setShowSaved] = useState(false);
   const savedAddresses = user?.savedAddresses || [];
+  const isB2B = localStorage.getItem('isB2B') === 'true';
 
   const formatPrice = (val) => {
     if (val === undefined || val === null) return '0';
@@ -61,10 +71,30 @@ export default function CheckoutPage({ cartItems, onNavigate, user, onOrderSucce
     return Number.isInteger(num) ? String(num) : num.toFixed(2);
   };
 
+  // Helper to get tiered price
+  const getItemPrice = (item) => {
+    let basePrice = 0;
+    if (item.priceTiers && item.priceTiers.length > 0) {
+      const sortedTiers = [...item.priceTiers].sort((a, b) => b.minQty - a.minQty);
+      const activeTier = sortedTiers.find(t => item.quantity >= t.minQty);
+      if (activeTier) basePrice = activeTier.price;
+    }
+    if (!basePrice) {
+      const priceStr = String(item.price);
+      const cleanedPrice = priceStr.replace(/[^\d.]/g, '');
+      basePrice = parseFloat(cleanedPrice) || 0;
+    }
+
+    // For B2B, include GST in the displayed checkout price
+    if (isB2B && item.gstPercent) {
+      return Number((basePrice * (1 + item.gstPercent / 100)).toFixed(2));
+    }
+
+    return basePrice;
+  };
+
   const subtotal = cartItems.reduce((acc, item) => {
-    const priceStr = String(item.price);
-    const price = parseFloat(priceStr.replace(/[^\d.]/g, '')) || 0;
-    return acc + (price * item.quantity);
+    return acc + (getItemPrice(item) * item.quantity);
   }, 0);
 
   const shipping = subtotal > 500 ? 0 : 50;
@@ -127,12 +157,9 @@ export default function CheckoutPage({ cartItems, onNavigate, user, onOrderSucce
     }
     setLoading(true);
 
-    const isB2B = localStorage.getItem('isB2B') === 'true';
-
     const orderPayload = {
       items: cartItems.map(item => {
-        const priceStr = String(item.price);
-        let basePrice = parseFloat(priceStr.replace(/[^\d.]/g, '')) || 0;
+        let basePrice = getItemPrice(item);
 
         return {
           product: item.id,
@@ -167,13 +194,23 @@ export default function CheckoutPage({ cartItems, onNavigate, user, onOrderSucce
       });
 
       const data = await response.json();
-      if (!response.ok) throw new Error(data.message);
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error('Your session has expired. Please log in again.');
+        }
+        throw new Error(data.message || 'Failed to place order');
+      }
 
       setPlacedOrder(data);
       setOrderComplete(true);
       if (onOrderSuccess) onOrderSuccess();
     } catch (err) {
       alert(err.message);
+      if (err.message === 'Your session has expired. Please log in again.') {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        window.location.href = '/';
+      }
     } finally {
       setLoading(false);
     }
@@ -184,9 +221,9 @@ export default function CheckoutPage({ cartItems, onNavigate, user, onOrderSucce
   const activeLocationId = physicalSlot ? physicalSlot.locationId : null;
 
   // Find the matching cutoff slot for this location (supporting isSameDay and globalIsSameDay fields)
-  const cutoffSlot = deliverySlots.find(slot => 
-    (slot.isSameDay || slot.globalIsSameDay) && 
-    slot.SameDayCutoff && 
+  const cutoffSlot = deliverySlots.find(slot =>
+    (slot.isSameDay || slot.globalIsSameDay) &&
+    slot.SameDayCutoff &&
     (!activeLocationId || String(slot.locationId) === String(activeLocationId))
   ) || deliverySlots.find(slot => (slot.isSameDay || slot.globalIsSameDay) && slot.SameDayCutoff);
 
@@ -196,17 +233,17 @@ export default function CheckoutPage({ cartItems, onNavigate, user, onOrderSucce
     if (!cutoffTimeStr) return false;
     const match = cutoffTimeStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
     if (!match) return false;
-    
+
     let [_, hours, minutes, ampm] = match;
     hours = parseInt(hours, 10);
     minutes = parseInt(minutes, 10);
-    
+
     if (ampm.toUpperCase() === 'PM' && hours < 12) hours += 12;
     if (ampm.toUpperCase() === 'AM' && hours === 12) hours = 0;
-    
+
     const now = new Date();
     const cutoffDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes, 0);
-    
+
     return now > cutoffDate;
   };
 
@@ -539,8 +576,8 @@ export default function CheckoutPage({ cartItems, onNavigate, user, onOrderSucce
                                 type="button"
                                 onClick={() => setSelectedSlot(slotValue)}
                                 className={`flex flex-col p-4 rounded-2xl border-2 text-left relative transition-all group ${isSelected
-                                    ? 'border-emerald-600 bg-emerald-50/50 ring-4 ring-emerald-500/10'
-                                    : 'border-gray-100 hover:border-gray-200'
+                                  ? 'border-emerald-600 bg-emerald-50/50 ring-4 ring-emerald-500/10'
+                                  : 'border-gray-100 hover:border-gray-200'
                                   }`}
                               >
                                 <div className="flex items-center justify-between w-full mb-1">
@@ -594,8 +631,8 @@ export default function CheckoutPage({ cartItems, onNavigate, user, onOrderSucce
                               type="button"
                               onClick={() => setSelectedSlot(slotValue)}
                               className={`flex flex-col p-4 rounded-2xl border-2 text-left relative transition-all group ${isSelected
-                                  ? 'border-emerald-600 bg-emerald-50/50 ring-4 ring-emerald-500/10'
-                                  : 'border-gray-100 hover:border-gray-200'
+                                ? 'border-emerald-600 bg-emerald-50/50 ring-4 ring-emerald-500/10'
+                                : 'border-gray-100 hover:border-gray-200'
                                 }`}
                             >
                               <div className="flex items-center justify-between w-full mb-1">
@@ -690,7 +727,7 @@ export default function CheckoutPage({ cartItems, onNavigate, user, onOrderSucce
                       <p className="text-xs text-gray-400 font-bold">Qty: {item.quantity}</p>
                     </div>
                   </div>
-                  <p className="text-sm font-black text-gray-900">₹{formatPrice(item.price)}</p>
+                  <p className="text-sm font-black text-gray-900">₹{formatPrice(getItemPrice(item))}</p>
                 </div>
               ))}
             </div>

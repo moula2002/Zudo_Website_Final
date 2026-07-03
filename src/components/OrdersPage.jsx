@@ -46,6 +46,13 @@ export default function OrdersPage({ onNavigate, user }) {
     return `${diffHours} hours ago`;
   };
 
+  const formatPrice = (val) => {
+    if (val === undefined || val === null) return '0';
+    const priceStr = String(val).replace(/[^\d.]/g, '');
+    const num = parseFloat(priceStr) || 0;
+    return Number.isInteger(num) ? num.toLocaleString('en-IN') : num.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+
   useEffect(() => {
     if (!trackingModal.open || !trackingModal.order?._id) {
       setActiveTrackingOrder(null);
@@ -554,7 +561,7 @@ export default function OrdersPage({ onNavigate, user }) {
                     <div className="flex items-center lg:items-end justify-between lg:flex-col gap-2 pt-4 lg:pt-0 border-t lg:border-t-0 border-gray-50">
                       <div className="text-left lg:text-right">
                         <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Total Amount</p>
-                        <p className="text-2xl font-black text-gray-900 tracking-tighter leading-none">₹{order.totalAmount}</p>
+                        <p className="text-2xl font-black text-gray-900 tracking-tighter leading-none">₹{formatPrice(order.totalAmount)}</p>
                       </div>
                       
                       <div className="flex items-center gap-2">
@@ -657,7 +664,7 @@ export default function OrdersPage({ onNavigate, user }) {
                             <div className="h-px bg-gray-100 my-2"></div>
                             <div className="flex justify-between items-center">
                               <span className="text-gray-900 font-black">Total Paid</span>
-                              <span className="text-xl font-black text-emerald-600">₹{order.totalAmount}</span>
+                              <span className="text-xl font-black text-emerald-600">₹{formatPrice(order.totalAmount)}</span>
                             </div>
                             
                             {/* Order Actions */}
@@ -751,10 +758,10 @@ export default function OrdersPage({ onNavigate, user }) {
                                   <div>
                                     <p className="font-black text-gray-900 text-sm leading-none mb-1">{item.product?.name || item.name || 'Unknown Product'}</p>
                                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest font-mono">
-                                      {item.quantity} × ₹{resolvedPrice}
+                                      {item.quantity} × ₹{formatPrice(resolvedPrice)}
                                       {resolvedNormalPrice > 0 && resolvedNormalPrice !== resolvedPrice && (
                                         <span className="text-amber-600 ml-2 font-bold normal-case">
-                                          (Normal: ₹{resolvedNormalPrice})
+                                          (Normal: ₹{formatPrice(resolvedNormalPrice)})
                                         </span>
                                       )}
                                     </p>
@@ -764,10 +771,10 @@ export default function OrdersPage({ onNavigate, user }) {
                                   </div>
                                 </div>
                                 <div className="text-right flex flex-col items-end gap-1.5">
-                                  <div className="text-sm font-black text-gray-900">₹{item.quantity * resolvedPrice}</div>
+                                  <div className="text-sm font-black text-gray-900">₹{formatPrice(item.quantity * resolvedPrice)}</div>
                                   {resolvedNormalPrice > 0 && resolvedNormalPrice !== resolvedPrice && (
                                     <div className="text-[10px] font-bold text-amber-600 mt-0.5">
-                                      Normal: ₹{item.quantity * resolvedNormalPrice}
+                                      Normal: ₹{formatPrice(item.quantity * resolvedNormalPrice)}
                                     </div>
                                   )}
                                   

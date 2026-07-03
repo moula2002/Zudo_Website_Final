@@ -12,7 +12,7 @@ export default function ProductDetails({ product, onAddToCart, onToggleWishlist,
 
   // Get active variant lists based on portal mode (B2B vs B2C)
   const variantsList = isB2B ? (product?.b2b || []) : (product?.b2c || []);
-  
+
   // Track selected packet size variant locally in details screen
   const [selectedVariant, setSelectedVariant] = useState(() => {
     if (variantsList && variantsList.length > 0) {
@@ -23,11 +23,15 @@ export default function ProductDetails({ product, onAddToCart, onToggleWishlist,
 
   // Derived state values based on active selector
   const activeSize = selectedVariant ? selectedVariant.packetSize : (product?.packetSize || product?.unit || '1 unit');
-  const activePrice = selectedVariant ? selectedVariant.price : product?.price;
-  const activeMrp = selectedVariant ? selectedVariant.mrp : (product?.oldPrice || product?.price);
+  const rawPrice = selectedVariant ? selectedVariant.price : product?.price;
+  const rawMrp = selectedVariant ? selectedVariant.mrp : (product?.oldPrice || product?.price);
   const activeStock = selectedVariant ? (selectedVariant.stock !== undefined ? selectedVariant.stock : product?.stock) : product?.stock;
   const activeGst = selectedVariant ? (selectedVariant.gstPercent || product?.gstPercent || 0) : (product?.gstPercent || 0);
   const activeMoq = isB2B ? (product?.moq || 1) : 1;
+  
+  // For B2B, prices in the database are exclusive of GST, but we want to show them inclusive of GST
+  const activePrice = (isB2B && rawPrice != null) ? Number((rawPrice * (1 + activeGst / 100)).toFixed(2)) : rawPrice;
+  const activeMrp = (isB2B && rawMrp != null) ? Number((rawMrp * (1 + activeGst / 100)).toFixed(2)) : rawMrp;
 
   // Uniquely identify the selected item size variant in the shopping cart
   const cartItemKey = `${product?.id}_${activeSize}`;
@@ -164,10 +168,10 @@ export default function ProductDetails({ product, onAddToCart, onToggleWishlist,
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-10">
         <div className="space-y-4">
           <div className="aspect-square bg-gray-50 dark:bg-white/5 rounded-2xl overflow-hidden group relative border border-gray-100 dark:border-white/10 transition-colors">
-            <img 
-              src={cleanImageUrl(product.image || product.imageUrl)} 
-              alt={product.name} 
-              className="w-full h-full object-contain p-6 transition-transform duration-500 group-hover:scale-105" 
+            <img
+              src={cleanImageUrl(product.image || product.imageUrl)}
+              alt={product.name}
+              className="w-full h-full object-contain p-6 transition-transform duration-500 group-hover:scale-105"
             />
             <div className="absolute top-4 left-4 flex flex-col gap-2">
               <span className="px-3 py-1 bg-white/90 dark:bg-emerald-600 backdrop-blur-md text-emerald-700 dark:text-white rounded-lg text-[9px] font-black uppercase tracking-widest shadow-sm border border-emerald-100/30">{product.category}</span>
@@ -179,9 +183,9 @@ export default function ProductDetails({ product, onAddToCart, onToggleWishlist,
           <div className="grid grid-cols-4 gap-3">
             {[...Array(4)].map((_, i) => (
               <div key={i} className="aspect-square bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-100 dark:border-white/10 hover:border-emerald-200 transition-all overflow-hidden p-2 opacity-60 hover:opacity-100 cursor-pointer">
-                <img 
-                  src={cleanImageUrl(product.image || product.imageUrl)} 
-                  className="w-full h-full object-contain" 
+                <img
+                  src={cleanImageUrl(product.image || product.imageUrl)}
+                  className="w-full h-full object-contain"
                 />
               </div>
             ))}
@@ -209,11 +213,10 @@ export default function ProductDetails({ product, onAddToCart, onToggleWishlist,
                     <button
                       key={i}
                       onClick={() => setSelectedVariant(v)}
-                      className={`text-xs font-black uppercase px-4 py-2.5 rounded-2xl border transition-all duration-300 ${
-                        activeSize === v.packetSize
+                      className={`text-xs font-black uppercase px-4 py-2.5 rounded-2xl border transition-all duration-300 ${activeSize === v.packetSize
                           ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-600/20 scale-105'
                           : 'bg-white dark:bg-white/5 border-gray-100 dark:border-white/10 text-gray-500 hover:border-emerald-200 hover:text-emerald-600'
-                      }`}
+                        }`}
                     >
                       {v.packetSize}
                     </button>
@@ -229,11 +232,11 @@ export default function ProductDetails({ product, onAddToCart, onToggleWishlist,
                   <Package size={14} className="text-emerald-600 dark:text-emerald-400" />
                   <span className="text-[10px] font-black text-emerald-700 dark:text-emerald-400 uppercase tracking-[0.2em]">Bulk Pricing Available</span>
                 </div>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="flex flex-col gap-2">
                   {product.priceTiers.sort((a, b) => a.minQty - b.minQty).map((tier, idx) => (
-                    <div key={idx} className="bg-white dark:bg-white/5 p-3 rounded-xl border border-emerald-100 dark:border-white/10 text-center">
-                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">{tier.minQty}+ {product.unit || 'Units'}</p>
-                      <p className="text-sm font-black text-emerald-600 dark:text-emerald-400">₹{tier.price}</p>
+                    <div key={idx} className="bg-white dark:bg-white/5 p-3 rounded-xl border border-emerald-100 dark:border-white/10 flex items-center justify-between">
+                      <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">{tier.minQty}+ {activeSize}</p>
+                      <p className="text-sm font-black text-emerald-600 dark:text-emerald-400">₹{isB2B ? Number((tier.price * (1 + activeGst / 100)).toFixed(2)) : tier.price}</p>
                     </div>
                   ))}
                 </div>
@@ -248,17 +251,16 @@ export default function ProductDetails({ product, onAddToCart, onToggleWishlist,
                 {activeMrp && !isPending && Number(activeMrp) > Number(activePrice) && (
                   <span className="text-xs text-gray-400 font-bold flex items-center gap-2 mt-1">
                     <span className="line-through">₹{activeMrp}</span>
-                       <span className="text-red-500 text-[9px] uppercase tracking-tighter">
-                         -{Math.round((1 - activePrice/activeMrp) * 100)}% Off
-                       </span>
+                    <span className="text-red-500 text-[9px] uppercase tracking-tighter">
+                      -{Math.round((1 - activePrice / activeMrp) * 100)}% Off
+                    </span>
                   </span>
                 )}
               </div>
-              <div className={`px-3 py-1 rounded-xl border transition-colors ${
-                (activeStock !== undefined && Number(activeStock) > 0)
-                  ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-50 dark:border-emerald-500/20 text-emerald-700 dark:text-emerald-400' 
+              <div className={`px-3 py-1 rounded-xl border transition-colors ${(activeStock !== undefined && Number(activeStock) > 0)
+                  ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-50 dark:border-emerald-500/20 text-emerald-700 dark:text-emerald-400'
                   : 'bg-red-50 dark:bg-red-500/10 border-red-50 dark:border-red-500/20 text-red-700 dark:text-red-400'
-              }`}>
+                }`}>
                 <p className="text-[8px] font-black uppercase tracking-widest opacity-85">Stock Status</p>
                 <p className="text-[11px] font-black">
                   {(activeStock !== undefined && Number(activeStock) > 0) ? `${activeStock} pcs available` : 'Out of Stock'}
@@ -304,27 +306,27 @@ export default function ProductDetails({ product, onAddToCart, onToggleWishlist,
                 <div className="flex items-center bg-white dark:bg-white/5 rounded-xl p-1 border border-gray-200 dark:border-white/10 transition-colors">
                   <button onClick={() => onUpdateQuantity(cartItemKey, -1)} className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-gray-50 dark:hover:bg-white/10 text-gray-900 dark:text-white transition-all"><Minus size={16} /></button>
                   <span className="w-10 text-center font-black text-base dark:text-white">{currentQuantity > 0 ? currentQuantity : activeMoq}</span>
-                  <button 
+                  <button
                     onClick={() => {
                       if (currentQuantity > 0) {
                         onUpdateQuantity(cartItemKey, 1);
                       } else {
                         onAddToCart(product, selectedVariant);
                       }
-                    }} 
+                    }}
                     className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-gray-50 dark:hover:bg-white/10 text-gray-900 dark:text-white transition-all"
                   >
                     <Plus size={16} />
                   </button>
                 </div>
-                <button 
+                <button
                   onClick={() => {
                     if (currentQuantity > 0) {
                       onNavigate('cart');
                     } else {
                       onAddToCart(product, selectedVariant);
                     }
-                  }} 
+                  }}
                   className="flex-grow h-12 bg-emerald-600 text-white rounded-xl font-black uppercase tracking-widest text-xs hover:bg-emerald-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 active:scale-[0.98]"
                 >
                   <ShoppingCart size={18} /> {currentQuantity > 0 ? 'View in Cart' : 'Add to Cart'}
@@ -373,7 +375,7 @@ export default function ProductDetails({ product, onAddToCart, onToggleWishlist,
             <div className="h-6 w-1 bg-emerald-600 rounded-full"></div>
             <h2 className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-900">Product Story</h2>
           </div>
-          
+
           <div className="max-w-3xl space-y-6">
             <div className="p-6 bg-emerald-50/20 rounded-2xl border border-emerald-50">
               <p className="text-gray-600 font-medium text-sm leading-relaxed italic">
@@ -408,63 +410,63 @@ export default function ProductDetails({ product, onAddToCart, onToggleWishlist,
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-10">
-          <div className="lg:col-span-2">
-            {!user ? (
-              <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-xl shadow-gray-200/20 text-center">
-                <h3 className="text-lg font-black text-gray-900 mb-4">Want to review?</h3>
-                <button onClick={() => onNavigate('profile')} className="px-6 py-3 bg-emerald-600 text-white rounded-xl font-black uppercase tracking-widest text-[10px] hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20">Sign In to Continue</button>
-              </div>
-            ) : reviews.some(r => r.userId?._id === user._id || r.userId === user._id) ? (
-              <div className="bg-emerald-50 p-8 rounded-3xl border border-emerald-100 shadow-sm text-center">
-                <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600 mx-auto mb-4">
-                  <CheckCircle2 size={24} />
+            <div className="lg:col-span-2">
+              {!user ? (
+                <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-xl shadow-gray-200/20 text-center">
+                  <h3 className="text-lg font-black text-gray-900 mb-4">Want to review?</h3>
+                  <button onClick={() => onNavigate('profile')} className="px-6 py-3 bg-emerald-600 text-white rounded-xl font-black uppercase tracking-widest text-[10px] hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20">Sign In to Continue</button>
                 </div>
-                <h3 className="text-lg font-black text-emerald-900 mb-2">Thank you!</h3>
-                <p className="text-emerald-700 text-[10px] font-bold uppercase tracking-widest">You have already reviewed this product.</p>
-              </div>
-            ) : (
-              <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-xl shadow-gray-200/20 sticky top-24">
-                <h3 className="text-lg font-black text-gray-900 mb-1 tracking-tight">Post Review</h3>
-                <p className="text-gray-400 text-[9px] font-bold uppercase tracking-widest mb-6">We value your feedback</p>
-                
-                <form onSubmit={handleReviewSubmit} className="space-y-4">
-                  <div className="flex gap-1.5">
-                    {[1,2,3,4,5].map(i => (
-                      <button key={i} type="button" onClick={() => setNewReview({...newReview, rating: i})} className="hover:scale-110 transition-transform">
-                        <Star size={24} className={i <= newReview.rating ? "fill-amber-400 text-amber-400" : "text-gray-100"} strokeWidth={0} />
-                      </button>
-                    ))}
+              ) : reviews.some(r => r.userId?._id === user._id || r.userId === user._id) ? (
+                <div className="bg-emerald-50 p-8 rounded-3xl border border-emerald-100 shadow-sm text-center">
+                  <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600 mx-auto mb-4">
+                    <CheckCircle2 size={24} />
                   </div>
-                  <textarea
-                    value={newReview.comment}
-                    onChange={(e) => setNewReview({ ...newReview, comment: e.target.value })}
-                    placeholder="Tell us what you liked..."
-                    className="w-full px-5 py-4 rounded-xl border border-gray-100 bg-gray-50/50 focus:bg-white focus:border-emerald-500 outline-none min-h-[120px] text-xs font-bold transition-all placeholder-gray-300 shadow-inner"
-                    required
-                  ></textarea>
+                  <h3 className="text-lg font-black text-emerald-900 mb-2">Thank you!</h3>
+                  <p className="text-emerald-700 text-[10px] font-bold uppercase tracking-widest">You have already reviewed this product.</p>
+                </div>
+              ) : (
+                <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-xl shadow-gray-200/20 sticky top-24">
+                  <h3 className="text-lg font-black text-gray-900 mb-1 tracking-tight">Post Review</h3>
+                  <p className="text-gray-400 text-[9px] font-bold uppercase tracking-widest mb-6">We value your feedback</p>
 
-                  <div className="flex flex-wrap gap-2">
-                    {newReview.media.map((item, idx) => (
-                      <div key={idx} className="relative w-14 h-14 rounded-lg overflow-hidden border border-emerald-100 group">
-                        <img src={item.url} alt="Review" className="w-full h-full object-cover" />
-                        <button onClick={() => removeMedia(idx)} type="button" className="absolute inset-0 bg-red-600/80 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={12} /></button>
-                      </div>
-                    ))}
-                    {newReview.media.length < 3 && (
-                      <label className={`w-14 h-14 rounded-lg border-2 border-dashed flex flex-col items-center justify-center gap-1 cursor-pointer transition-all ${uploadingImage ? 'bg-gray-100 border-gray-200' : 'bg-white border-gray-200 hover:border-emerald-400'}`}>
-                        {uploadingImage ? <div className="w-3 h-3 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin"></div> : <Camera size={18} className="text-gray-300" />}
-                        <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} />
-                      </label>
-                    )}
-                  </div>
+                  <form onSubmit={handleReviewSubmit} className="space-y-4">
+                    <div className="flex gap-1.5">
+                      {[1, 2, 3, 4, 5].map(i => (
+                        <button key={i} type="button" onClick={() => setNewReview({ ...newReview, rating: i })} className="hover:scale-110 transition-transform">
+                          <Star size={24} className={i <= newReview.rating ? "fill-amber-400 text-amber-400" : "text-gray-100"} strokeWidth={0} />
+                        </button>
+                      ))}
+                    </div>
+                    <textarea
+                      value={newReview.comment}
+                      onChange={(e) => setNewReview({ ...newReview, comment: e.target.value })}
+                      placeholder="Tell us what you liked..."
+                      className="w-full px-5 py-4 rounded-xl border border-gray-100 bg-gray-50/50 focus:bg-white focus:border-emerald-500 outline-none min-h-[120px] text-xs font-bold transition-all placeholder-gray-300 shadow-inner"
+                      required
+                    ></textarea>
 
-                  <button type="submit" disabled={reviewLoading || uploadingImage} className="w-full py-3.5 bg-emerald-600 text-white rounded-xl font-black uppercase tracking-widest text-[9px] hover:bg-emerald-700 shadow-lg shadow-emerald-600/20 active:scale-[0.98] transition-all disabled:opacity-50">
-                    Submit Review
-                  </button>
-                </form>
-              </div>
-            )}
-          </div>
+                    <div className="flex flex-wrap gap-2">
+                      {newReview.media.map((item, idx) => (
+                        <div key={idx} className="relative w-14 h-14 rounded-lg overflow-hidden border border-emerald-100 group">
+                          <img src={item.url} alt="Review" className="w-full h-full object-cover" />
+                          <button onClick={() => removeMedia(idx)} type="button" className="absolute inset-0 bg-red-600/80 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={12} /></button>
+                        </div>
+                      ))}
+                      {newReview.media.length < 3 && (
+                        <label className={`w-14 h-14 rounded-lg border-2 border-dashed flex flex-col items-center justify-center gap-1 cursor-pointer transition-all ${uploadingImage ? 'bg-gray-100 border-gray-200' : 'bg-white border-gray-200 hover:border-emerald-400'}`}>
+                          {uploadingImage ? <div className="w-3 h-3 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin"></div> : <Camera size={18} className="text-gray-300" />}
+                          <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} />
+                        </label>
+                      )}
+                    </div>
+
+                    <button type="submit" disabled={reviewLoading || uploadingImage} className="w-full py-3.5 bg-emerald-600 text-white rounded-xl font-black uppercase tracking-widest text-[9px] hover:bg-emerald-700 shadow-lg shadow-emerald-600/20 active:scale-[0.98] transition-all disabled:opacity-50">
+                      Submit Review
+                    </button>
+                  </form>
+                </div>
+              )}
+            </div>
 
             <div className="lg:col-span-3 space-y-6">
               {reviews.length === 0 ? (

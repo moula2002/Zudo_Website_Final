@@ -46,14 +46,24 @@ export default function CartPage({ cartItems, onUpdateQuantity, onRemove, onNavi
 
   // Helper to get tiered price
   const getItemPrice = (item) => {
+    let basePrice = 0;
     if (item.priceTiers && item.priceTiers.length > 0) {
       const sortedTiers = [...item.priceTiers].sort((a, b) => b.minQty - a.minQty);
       const activeTier = sortedTiers.find(t => item.quantity >= t.minQty);
-      if (activeTier) return activeTier.price;
+      if (activeTier) basePrice = activeTier.price;
     }
-    const priceStr = String(item.price);
-    const cleanedPrice = priceStr.replace(/[^\d.]/g, '');
-    return parseFloat(cleanedPrice) || 0;
+    if (!basePrice) {
+      const priceStr = String(item.price);
+      const cleanedPrice = priceStr.replace(/[^\d.]/g, '');
+      basePrice = parseFloat(cleanedPrice) || 0;
+    }
+    
+    // For B2B, include GST in the displayed cart price
+    if (isB2B && item.gstPercent) {
+      return Number((basePrice * (1 + item.gstPercent / 100)).toFixed(2));
+    }
+    
+    return basePrice;
   };
 
   const subtotal = cartItems.reduce((acc, item) => {
