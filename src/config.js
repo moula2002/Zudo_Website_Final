@@ -1,6 +1,6 @@
-export const API_BASE_URL = 'https://lightgreen-trout-176417.hostingersite.com';
+export const API_BASE_URL = import.meta.env.DEV ? '' : 'https://snbtradingco.in';
 export const API_URL = `${API_BASE_URL}/api`;
-export const IMAGE_BASE_URL = 'https://lightgreen-trout-176417.hostingersite.com';
+export const IMAGE_BASE_URL = 'https://snbtradingco.in';
 export const UPLOAD_URL = `${API_BASE_URL}/api/upload`;
 
 export const cleanImageUrl = (url) => {
