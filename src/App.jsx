@@ -361,7 +361,7 @@ function App() {
     setCurrentPage('home');
   };
 
-  const addToCart = (product, selectedVariant = null) => {
+  const addToCart = (product, selectedVariant = null, quantityToAdd = null) => {
     let varInfo = {};
     const variantsList = isB2B ? product.b2b : product.b2c;
     
@@ -371,7 +371,11 @@ function App() {
         price: selectedVariant.price,
         mrp: selectedVariant.mrp || selectedVariant.price,
         stock: selectedVariant.stock !== undefined ? selectedVariant.stock : product.stock,
-        gstPercent: selectedVariant.gstPercent || product.gstPercent || 0
+        gstPercent: selectedVariant.gstPercent || product.gstPercent || 0,
+        sellerPrice: selectedVariant.sellerPrice !== undefined ? selectedVariant.sellerPrice : product.sellerPrice,
+        commissionType: selectedVariant.commissionType || product.commissionType || 'flat',
+        commissionValue: selectedVariant.commissionValue !== undefined ? selectedVariant.commissionValue : product.commissionValue,
+        commissionAmount: selectedVariant.commissionAmount !== undefined ? selectedVariant.commissionAmount : product.commissionAmount
       };
     } else if (variantsList && variantsList.length > 0) {
       const defaultVar = variantsList[0];
@@ -380,7 +384,11 @@ function App() {
         price: defaultVar.price,
         mrp: defaultVar.mrp || defaultVar.price,
         stock: defaultVar.stock !== undefined ? defaultVar.stock : product.stock,
-        gstPercent: defaultVar.gstPercent || product.gstPercent || 0
+        gstPercent: defaultVar.gstPercent || product.gstPercent || 0,
+        sellerPrice: defaultVar.sellerPrice !== undefined ? defaultVar.sellerPrice : product.sellerPrice,
+        commissionType: defaultVar.commissionType || product.commissionType || 'flat',
+        commissionValue: defaultVar.commissionValue !== undefined ? defaultVar.commissionValue : product.commissionValue,
+        commissionAmount: defaultVar.commissionAmount !== undefined ? defaultVar.commissionAmount : product.commissionAmount
       };
     } else {
       varInfo = {
@@ -388,7 +396,11 @@ function App() {
         price: isB2B ? (product.b2bPrice || product.price) : product.price,
         mrp: product.oldPrice || (isB2B ? (product.b2bPrice || product.price) : product.price),
         stock: product.stock,
-        gstPercent: product.gstPercent || 0
+        gstPercent: product.gstPercent || 0,
+        sellerPrice: isB2B ? (product.sellerB2bPrice || product.sellerPrice) : product.sellerPrice,
+        commissionType: product.commissionType || 'flat',
+        commissionValue: product.commissionValue || 0,
+        commissionAmount: product.commissionAmount || 0
       };
     }
 
@@ -399,6 +411,10 @@ function App() {
     }
 
     const cartKey = `${product.id}_${varInfo.selectedPacketSize}`;
+
+    const initialQty = quantityToAdd && Number(quantityToAdd) > 0
+      ? Math.min(Number(quantityToAdd), maxStock)
+      : (isB2B ? (product.moq || 1) : 1);
 
     setCartItems(prev => {
       const existing = prev.find(item => item.cartKey === cartKey);
@@ -413,7 +429,11 @@ function App() {
         oldPrice: varInfo.mrp,
         stock: varInfo.stock,
         gstPercent: varInfo.gstPercent,
-        quantity: isB2B ? (product.moq || 1) : 1 
+        sellerPrice: varInfo.sellerPrice,
+        commissionType: varInfo.commissionType,
+        commissionValue: varInfo.commissionValue,
+        commissionAmount: varInfo.commissionAmount,
+        quantity: initialQty 
       }];
     });
     

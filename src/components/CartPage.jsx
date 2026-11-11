@@ -1,6 +1,7 @@
 import React from 'react';
 import { Trash2, ArrowLeft, ShoppingBag, CreditCard, ChevronRight, ShieldCheck, Clock } from 'lucide-react';
 import { cleanImageUrl, API_URL } from '../config';
+import { calculateItemPricing, calculateCartSummary } from '../utils/pricing';
 
 export default function CartPage({ cartItems, onUpdateQuantity, onRemove, onNavigate, isB2B }) {
   const user = JSON.parse(localStorage.getItem('user') || 'null');
@@ -66,12 +67,10 @@ export default function CartPage({ cartItems, onUpdateQuantity, onRemove, onNavi
     return basePrice;
   };
 
-  const subtotal = cartItems.reduce((acc, item) => {
-    return acc + (getItemPrice(item) * item.quantity);
-  }, 0);
-
-  const deliveryFee = subtotal > 500 ? 0 : 50;
-  const total = subtotal + deliveryFee;
+  const cartSummary = calculateCartSummary(cartItems, isB2B);
+  const subtotal = cartSummary.subtotal;
+  const deliveryFee = cartSummary.deliveryFee;
+  const total = cartSummary.total;
 
   if (isB2BPending) {
     return (
@@ -160,12 +159,26 @@ export default function CartPage({ cartItems, onUpdateQuantity, onRemove, onNavi
                             : (item.sellerId?.businessName || item.sellerId?.name || item.sellerName || 'Zudo Official')}
                         </span>
                       </div>
-                      <div className="flex flex-col items-end">
-                        <div className="text-emerald-600 font-black text-xl tracking-tighter">₹{formatPrice(getItemPrice(item))}</div>
-                        {item.priceTiers?.some(t => item.quantity >= t.minQty) && (
-                          <span className="text-[8px] font-black text-emerald-500 uppercase tracking-widest bg-emerald-50 px-1.5 py-0.5 rounded-md mt-1 border border-emerald-100">Bulk Applied</span>
-                        )}
-                      </div>
+                      {(() => {
+                        const itemPricing = calculateItemPricing({ item, quantity: item.quantity, isB2B });
+                        return (
+                          <div className="flex flex-col items-end">
+                            <div className="text-emerald-600 font-black text-xl tracking-tighter">
+                              ₹{formatPrice(itemPricing.finalCustomerPrice)}
+                            </div>
+                            <div className="text-[10px] text-gray-400 font-bold mt-0.5">
+                              ₹{formatPrice(itemPricing.unitCustomerPrice)} / unit
+                            </div>
+                            <div className="text-[9px] font-bold text-gray-500 mt-1 bg-gray-50 px-2 py-0.5 rounded border border-gray-100">
+                              Commission: ₹{formatPrice(itemPricing.totalCommission)}
+                              {item.quantity > 1 && ` (₹${formatPrice(itemPricing.unitCommission)} × ${item.quantity})`}
+                            </div>
+                            {item.priceTiers?.some(t => item.quantity >= t.minQty) && (
+                              <span className="text-[8px] font-black text-emerald-500 uppercase tracking-widest bg-emerald-50 px-1.5 py-0.5 rounded-md mt-1 border border-emerald-100">Bulk Applied</span>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
 
                     <div className="flex items-center justify-between sm:justify-end gap-6">
@@ -208,11 +221,21 @@ export default function CartPage({ cartItems, onUpdateQuantity, onRemove, onNavi
                 <h2 className="text-2xl font-black text-gray-900 tracking-tight">Order Summary</h2>
               </div>
               
-              <div className="space-y-5 mb-8">
+              <div className="space-y-4 mb-8">
                 <div className="flex justify-between text-gray-500 font-bold">
-                  <span className="text-sm">Subtotal ({cartItems.length} items)</span>
-                  <span className="text-gray-900 font-black">₹{formatPrice(subtotal)}</span>
+                  <span className="text-sm">Seller Subtotal ({cartItems.length} items)</span>
+                  <span className="text-gray-900 font-black">₹{formatPrice(cartSummary.totalSellerBase)}</span>
                 </div>
+                <div className="flex justify-between text-gray-500 font-bold">
+                  <span className="text-sm">Platform Commission</span>
+                  <span className="text-emerald-600 font-black">+₹{formatPrice(cartSummary.totalCommission)}</span>
+                </div>
+                {cartSummary.totalGst > 0 && (
+                  <div className="flex justify-between text-gray-500 font-bold">
+                    <span className="text-sm">Applicable GST</span>
+                    <span className="text-gray-900 font-black">+₹{formatPrice(cartSummary.totalGst)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-gray-500 font-bold">
                   <span className="text-sm">Delivery Fee</span>
                   <span className="text-gray-900">

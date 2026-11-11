@@ -93,12 +93,10 @@ export default function CheckoutPage({ cartItems, onNavigate, user, onOrderSucce
     return basePrice;
   };
 
-  const subtotal = cartItems.reduce((acc, item) => {
-    return acc + (getItemPrice(item) * item.quantity);
-  }, 0);
-
-  const shipping = subtotal > 500 ? 0 : 50;
-  const total = subtotal + shipping;
+  const cartSummary = calculateCartSummary(cartItems, localStorage.getItem('isB2B') === 'true');
+  const subtotal = cartSummary.subtotal;
+  const shipping = cartSummary.deliveryFee;
+  const total = cartSummary.total;
 
   const [pincodeError, setPincodeError] = useState('');
 
@@ -297,7 +295,7 @@ export default function CheckoutPage({ cartItems, onNavigate, user, onOrderSucce
               <Truck size={14} className="text-emerald-300" />
               <p className="text-[10px] font-black uppercase tracking-[0.3em] text-emerald-200">Delivery OTP</p>
             </div>
-            <p className="text-5xl font-black tracking-[0.5em] font-mono mb-4">{placedOrder.deliveryOtp}</p>
+            <p className="text-4xl sm:text-5xl font-black tracking-[0.25em] font-mono mb-4">{placedOrder.deliveryOtp}</p>
             <p className="text-[10px] font-bold text-emerald-100/60 leading-tight">Share this code with the partner during delivery.</p>
           </div>
         )}
@@ -714,38 +712,60 @@ export default function CheckoutPage({ cartItems, onNavigate, user, onOrderSucce
           <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100 sticky top-28">
             <h3 className="text-xl font-black text-gray-900 mb-6">Order Summary</h3>
             <div className="space-y-4 mb-8">
-              {cartItems.map(item => (
-                <div key={item.id} className="flex justify-between items-center gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-lg bg-gray-50 flex-shrink-0 overflow-hidden border border-gray-100">
-                      <img src={cleanImageUrl(item.image)} alt={item.name} className="w-full h-full object-cover" />
+              {cartItems.map(item => {
+                const itemPricing = calculateItemPricing({ 
+                  item, 
+                  quantity: item.quantity, 
+                  isB2B: localStorage.getItem('isB2B') === 'true' 
+                });
+                return (
+                  <div key={item.id} className="flex justify-between items-center gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-lg bg-gray-50 flex-shrink-0 overflow-hidden border border-gray-100">
+                        <img src={cleanImageUrl(item.image)} alt={item.name} className="w-full h-full object-cover" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-gray-800 line-clamp-1">
+                          {item.name} {item.selectedPacketSize && `(${item.selectedPacketSize})`}
+                        </p>
+                        <p className="text-xs text-gray-400 font-bold">
+                          Qty: {item.quantity} × ₹{formatPrice(itemPricing.unitCustomerPrice)}
+                        </p>
+                        <p className="text-[10px] text-gray-500 font-medium">
+                          Comm: ₹{formatPrice(itemPricing.totalCommission)}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-sm font-bold text-gray-800 line-clamp-1">
-                        {item.name} {item.selectedPacketSize && `(${item.selectedPacketSize})`}
-                      </p>
-                      <p className="text-xs text-gray-400 font-bold">Qty: {item.quantity}</p>
-                    </div>
+                    <p className="text-sm font-black text-gray-900">₹{formatPrice(itemPricing.finalCustomerPrice)}</p>
                   </div>
-                  <p className="text-sm font-black text-gray-900">₹{formatPrice(getItemPrice(item))}</p>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             <div className="space-y-3 pt-6 border-t border-gray-50">
               <div className="space-y-3 pt-6 border-t border-gray-50">
                 <div className="flex justify-between text-gray-500">
-                  <span className="font-bold">Subtotal</span>
-                  <span className="font-black text-gray-900">₹{formatPrice(subtotal)}</span>
-                </div>
+                <span className="font-bold">Seller Subtotal</span>
+                <span className="font-black text-gray-900">₹{formatPrice(cartSummary.totalSellerBase)}</span>
+              </div>
+              <div className="flex justify-between text-gray-500">
+                <span className="font-bold">Platform Commission</span>
+                <span className="font-black text-emerald-600">+₹{formatPrice(cartSummary.totalCommission)}</span>
+              </div>
+              {cartSummary.totalGst > 0 && (
                 <div className="flex justify-between text-gray-500">
-                  <span className="font-bold">Shipping</span>
-                  <span className="font-black text-emerald-600">{shipping === 0 ? 'FREE' : `₹${formatPrice(shipping)}`}</span>
+                  <span className="font-bold">Applicable GST</span>
+                  <span className="font-black text-gray-900">+₹{formatPrice(cartSummary.totalGst)}</span>
                 </div>
-                <div className="flex justify-between pt-4 mt-2 border-t-2 border-gray-100">
-                  <span className="text-lg font-black text-gray-900">Total</span>
-                  <span className="text-2xl font-black text-emerald-600">₹{formatPrice(total)}</span>
-                </div>
+              )}
+              <div className="flex justify-between text-gray-500">
+                <span className="font-bold">Shipping</span>
+                <span className="font-black text-emerald-600">{shipping === 0 ? 'FREE' : `₹${formatPrice(shipping)}`}</span>
+              </div>
+              <div className="flex justify-between pt-4 mt-2 border-t-2 border-gray-100">
+                <span className="text-lg font-black text-gray-900">Total</span>
+                <span className="text-2xl font-black text-emerald-600">₹{formatPrice(total)}</span>
+              </div>
                 {localStorage.getItem('isB2B') === 'true' && total < 2000 && (
                   <div className="mt-4 p-3 bg-red-50 border border-red-100 rounded-xl flex items-center gap-2">
                     <AlertTriangle size={16} className="text-red-500 flex-shrink-0" />

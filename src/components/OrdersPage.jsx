@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Package, Calendar, Clock, ChevronRight, ShoppingBag, ArrowLeft, CheckCircle2, Truck, AlertCircle, MapPin, Receipt, ExternalLink, ChevronDown, ChevronUp, User, Phone, Camera, Upload, X, Search, Filter, Navigation as NavIcon } from 'lucide-react';
+import { Package, Calendar, Clock, ChevronRight, ShoppingBag, ArrowLeft, CheckCircle2, Truck, AlertCircle, MapPin, ReceiptIndianRupee, ExternalLink, ChevronDown, ChevronUp, User, Phone, Camera, Upload, X, Search, Filter, Navigation as NavIcon, ShieldCheck, Star } from 'lucide-react';
 import { API_URL, API_BASE_URL, IMAGE_BASE_URL, cleanImageUrl, UPLOAD_URL } from '../config';
 import { generateInvoice } from '../utils/invoiceGenerator';
 
@@ -15,6 +15,10 @@ export default function OrdersPage({ onNavigate, user }) {
   const [returnModal, setReturnModal] = useState({ open: false, order: null, item: null });
   const [returnForm, setReturnForm] = useState({ selectedReason: '', comment: '', image: null, preview: null, refundAccountName: '', refundBankName: '', refundAccountNumber: '', refundIfscCode: '' });
   const [submittingReturn, setSubmittingReturn] = useState(false);
+  const [reviewModal, setReviewModal] = useState({ open: false, order: null, item: null, productId: null });
+  const [reviewForm, setReviewForm] = useState({ rating: 5, title: '', comment: '', existingReviewId: null });
+  const [submittingReview, setSubmittingReview] = useState(false);
+  const [reviewSuccessMsg, setReviewSuccessMsg] = useState('');
   const [filterStatus, setFilterStatus] = useState('All');
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFilter, setDateFilter] = useState('All');
@@ -269,8 +273,105 @@ export default function OrdersPage({ onNavigate, user }) {
     }
   };
 
+  const openReviewModalForItem = async (order, item) => {
+    const resolvedProductId = item.productId?._id || item.productId || item.product?._id || item.product || item._id;
+    setReviewModal({ open: true, order, item, productId: resolvedProductId });
+    setReviewForm({ rating: 5, title: '', comment: '', existingReviewId: null });
+    setReviewSuccessMsg('');
+
+    try {
+      const res = await fetch(`${apiBase}/reviews/can-review/${resolvedProductId}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      const data = await res.json();
+      if (data?.success && data?.hasReviewed && data?.existingReview) {
+        setReviewForm({
+          rating: data.existingReview.rating || 5,
+          title: data.existingReview.title || '',
+          comment: data.existingReview.comment || '',
+          existingReviewId: data.existingReview._id
+        });
+      }
+    } catch (err) {
+      console.log('Error checking review status:', err);
+    }
+  };
+
+  const handleReviewSubmit = async (e) => {
+    e.preventDefault();
+    if (!reviewForm.comment || reviewForm.comment.trim().length < 3) {
+      alert('Please provide a review comment (minimum 3 characters).');
+      return;
+    }
+
+    setSubmittingReview(true);
+    try {
+      const token = localStorage.getItem('token');
+      const url = reviewForm.existingReviewId 
+        ? `${apiBase}/reviews/${reviewForm.existingReviewId}`
+        : `${apiBase}/reviews`;
+      const method = reviewForm.existingReviewId ? 'PUT' : 'POST';
+
+      const body = {
+        productId: reviewModal.productId,
+        rating: Number(reviewForm.rating),
+        title: reviewForm.title.trim(),
+        comment: reviewForm.comment.trim()
+      };
+
+      const res = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(body)
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setReviewSuccessMsg('Review submitted successfully! Thank you for your feedback.');
+        setTimeout(() => {
+          setReviewModal({ open: false, order: null, item: null, productId: null });
+          setReviewSuccessMsg('');
+        }, 1500);
+      } else {
+        alert(data.message || 'Failed to submit review');
+      }
+    } catch (err) {
+      console.error('Error submitting review:', err);
+      alert('Failed to submit review. Please try again.');
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
+
   const toggleOrderExpansion = (orderId) => {
     setExpandedOrder(expandedOrder === orderId ? null : orderId);
+  };
+
+  const handleResendOtp = async (orderId) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${apiBase}/api/orders/${orderId}/resend-delivery-otp`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        alert(data.message || 'Failed to resend OTP');
+      } else {
+        alert(data.message || '6-digit OTP sent to your registered mobile number!');
+        fetchOrders();
+      }
+    } catch (err) {
+      alert('Error requesting OTP resend');
+    }
   };
 
 
@@ -418,7 +519,7 @@ export default function OrdersPage({ onNavigate, user }) {
                 <p className="text-xl font-black text-white leading-none mt-1">{orders.length}</p>
               </div>
               <div className="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center text-white shadow-lg">
-                <Receipt size={16} />
+                <ReceiptIndianRupee size={16} />
               </div>
             </div>
           </div>
@@ -570,7 +671,7 @@ export default function OrdersPage({ onNavigate, user }) {
                           className="p-2.5 bg-gray-50 text-gray-400 hover:bg-emerald-50 hover:text-emerald-600 rounded-xl transition-all border border-gray-100"
                           title="Download Invoice"
                         >
-                          <Receipt size={16} />
+                          <ReceiptIndianRupee size={16} />
                         </button>
                         {order.orderStatus?.toLowerCase() === 'out for delivery' && (
                           <button 
@@ -630,7 +731,7 @@ export default function OrdersPage({ onNavigate, user }) {
                         {/* Payment Summary */}
                         <div className="space-y-4">
                           <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
-                            <Receipt size={14} className="text-emerald-500" />
+                            <ReceiptIndianRupee size={14} className="text-emerald-500" />
                             Payment Details
                           </h3>
                           <div className="bg-white p-5 rounded-3xl border border-emerald-100 shadow-sm space-y-3">
@@ -715,6 +816,31 @@ export default function OrdersPage({ onNavigate, user }) {
                             </div>
                           </div>
                         )}
+
+                        {/* Customer 6-Digit Delivery OTP Verification Box */}
+                        {order.deliveryOtp && order.orderStatus === 'Out for Delivery' && (
+                          <div className="bg-emerald-50 border-2 border-emerald-500/20 p-5 rounded-3xl space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-black text-emerald-800 uppercase tracking-widest flex items-center gap-1.5">
+                                <ShieldCheck size={14} className="text-emerald-600" />
+                                Delivery Verification OTP
+                              </span>
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); handleResendOtp(order._id); }}
+                                className="text-[10px] font-black text-emerald-700 hover:text-emerald-900 underline uppercase tracking-wider"
+                              >
+                                Resend OTP
+                              </button>
+                            </div>
+                            <div className="font-mono text-3xl font-black tracking-[0.3em] text-emerald-700 text-center py-2 bg-white rounded-2xl border border-emerald-100 shadow-sm select-all">
+                              {order.deliveryOtp}
+                            </div>
+                            <p className="text-[10px] text-emerald-600 font-medium text-center">
+                              Share this 6-digit OTP with your delivery agent only upon receiving your package.
+                            </p>
+                          </div>
+                        )}
                       </div>
 
 
@@ -778,19 +904,33 @@ export default function OrdersPage({ onNavigate, user }) {
                                     </div>
                                   )}
                                   
-                                  {/* Item Return Status / Badge or Button */}
-                                  {getItemReturnStatusBadge(item, order) ? (
-                                    getItemReturnStatusBadge(item, order)
-                                  ) : (
-                                    (order.orderStatus === 'Delivered' || order.orderStatus === 'Partially Returned') && canReturn(order) && (
+                                  {/* Item Actions */}
+                                  <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                                    {(order.orderStatus === 'Delivered' || order.orderStatus === 'Partially Returned') && (
                                       <button
-                                        onClick={() => setReturnModal({ open: true, order, item })}
-                                        className="px-2.5 py-1 bg-amber-50 hover:bg-amber-500 text-amber-700 hover:text-white border border-amber-200 hover:border-amber-500 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all"
+                                        onClick={() => openReviewModalForItem(order, item)}
+                                        className="px-2.5 py-1 bg-amber-50 hover:bg-amber-500 text-amber-700 hover:text-white border border-amber-200 hover:border-amber-500 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all flex items-center gap-1 shadow-sm"
+                                        title="Write a review for this delivered product"
                                       >
-                                        Return
+                                        <Star size={10} className="fill-amber-400 stroke-amber-500" />
+                                        Rate & Review
                                       </button>
-                                    )
-                                  )}
+                                    )}
+
+                                    {/* Item Return Status / Badge or Button */}
+                                    {getItemReturnStatusBadge(item, order) ? (
+                                      getItemReturnStatusBadge(item, order)
+                                    ) : (
+                                      (order.orderStatus === 'Delivered' || order.orderStatus === 'Partially Returned') && canReturn(order) && (
+                                        <button
+                                          onClick={() => setReturnModal({ open: true, order, item })}
+                                          className="px-2.5 py-1 bg-gray-50 hover:bg-gray-200 text-gray-700 border border-gray-200 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all"
+                                        >
+                                          Return
+                                        </button>
+                                      )
+                                    )}
+                                  </div>
                                 </div>
                               </div>
                             );
@@ -965,6 +1105,163 @@ export default function OrdersPage({ onNavigate, user }) {
           </div>
         </div>
       )}
+
+      {/* Product Review Modal */}
+      {reviewModal.open && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => !submittingReview && setReviewModal({ open: false, order: null, item: null, productId: null })}></div>
+          <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl relative z-10 overflow-hidden animate-[scaleIn_0.2s_ease-out]">
+            {/* Modal Header */}
+            <div className="bg-amber-500 p-5 text-white flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-black tracking-tight flex items-center gap-2">
+                  <Star size={20} className="fill-white stroke-white" />
+                  {reviewForm.existingReviewId ? 'Update Your Review' : 'Rate & Review Product'}
+                </h2>
+                <p className="text-amber-100 text-xs font-medium mt-0.5">
+                  Share your experience with other shoppers
+                </p>
+              </div>
+              <button 
+                onClick={() => setReviewModal({ open: false, order: null, item: null, productId: null })}
+                className="p-1.5 hover:bg-white/20 rounded-lg transition-colors text-white"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Product Card Snippet */}
+            <div className="p-4 bg-gray-50 border-b border-gray-100 flex items-center gap-3">
+              <div className="w-12 h-12 rounded-xl bg-white border border-gray-200 overflow-hidden shrink-0 flex items-center justify-center">
+                <img 
+                  src={formatImageUrl(reviewModal.item?.product?.imageUrl || reviewModal.item?.product?.image || reviewModal.item?.image || reviewModal.item?.imageUrl)} 
+                  alt="" 
+                  className="w-full h-full object-cover" 
+                />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="font-bold text-gray-900 text-sm truncate">
+                  {reviewModal.item?.product?.name || reviewModal.item?.name || 'Product'}
+                </p>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full inline-flex items-center gap-1 border border-emerald-200">
+                    <ShieldCheck size={10} /> Verified Purchase
+                  </span>
+                  <span className="text-gray-400 text-xs font-semibold">
+                    Order #{reviewModal.order?._id?.slice(-6).toUpperCase()}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {reviewSuccessMsg ? (
+              <div className="p-8 text-center space-y-3">
+                <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto animate-bounce">
+                  <CheckCircle2 size={32} />
+                </div>
+                <h3 className="text-lg font-bold text-gray-900">Review Submitted!</h3>
+                <p className="text-sm text-gray-600">{reviewSuccessMsg}</p>
+              </div>
+            ) : (
+              <form onSubmit={handleReviewSubmit} className="p-5 space-y-4">
+                {/* Star Rating Selector */}
+                <div>
+                  <label className="text-xs font-bold text-gray-700 block mb-1">
+                    Your Overall Rating <span className="text-red-500">*</span>
+                  </label>
+                  <div className="flex items-center gap-2">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button
+                        key={star}
+                        type="button"
+                        onClick={() => setReviewForm({ ...reviewForm, rating: star })}
+                        className="p-1 hover:scale-125 transition-transform focus:outline-none"
+                      >
+                        <Star
+                          size={28}
+                          className={`${
+                            star <= reviewForm.rating
+                              ? 'text-amber-400 fill-amber-400'
+                              : 'text-gray-300 stroke-[1.5]'
+                          }`}
+                        />
+                      </button>
+                    ))}
+                    <span className="ml-2 text-xs font-bold text-gray-700 bg-gray-100 px-2.5 py-1 rounded-lg">
+                      {reviewForm.rating === 5 && '⭐⭐⭐⭐⭐ Excellent'}
+                      {reviewForm.rating === 4 && '⭐⭐⭐⭐ Very Good'}
+                      {reviewForm.rating === 3 && '⭐⭐⭐ Good'}
+                      {reviewForm.rating === 2 && '⭐⭐ Fair'}
+                      {reviewForm.rating === 1 && '⭐ Poor'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Title */}
+                <div>
+                  <label className="text-xs font-bold text-gray-700 block mb-1">
+                    Review Title (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={reviewForm.title}
+                    onChange={(e) => setReviewForm({ ...reviewForm, title: e.target.value })}
+                    placeholder="e.g. Great quality, fits perfectly!"
+                    className="w-full px-3 py-2.5 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none text-sm transition-all font-medium"
+                    maxLength={100}
+                  />
+                </div>
+
+                {/* Comment */}
+                <div>
+                  <label className="text-xs font-bold text-gray-700 block mb-1">
+                    Written Review <span className="text-red-500">*</span>
+                  </label>
+                  <textarea
+                    rows="3"
+                    value={reviewForm.comment}
+                    onChange={(e) => setReviewForm({ ...reviewForm, comment: e.target.value })}
+                    placeholder="What did you like or dislike about this product? How is the quality, packaging, and performance?"
+                    className="w-full px-3 py-2.5 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none text-sm transition-all font-medium resize-none"
+                    required
+                    minLength={3}
+                  />
+                  <div className="flex justify-between items-center mt-1 text-[10px] text-gray-400 font-semibold">
+                    <span>Minimum 3 characters</span>
+                    <span>{reviewForm.comment.length} characters</span>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex gap-3 pt-2 border-t border-gray-100">
+                  <button
+                    type="button"
+                    disabled={submittingReview}
+                    onClick={() => setReviewModal({ open: false, order: null, item: null, productId: null })}
+                    className="flex-1 py-2.5 border border-gray-200 text-gray-600 font-bold rounded-xl hover:bg-gray-50 transition-all text-sm"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submittingReview || !reviewForm.comment || reviewForm.comment.trim().length < 3}
+                    className="flex-[2] py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl shadow-lg shadow-amber-500/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50 text-sm cursor-pointer"
+                  >
+                    {submittingReview ? (
+                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      <>
+                        <Star size={16} className="fill-current" />
+                        {reviewForm.existingReviewId ? 'Save Review' : 'Submit Review'}
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
       {/* Live Tracking Modal */}
       {trackingModal.open && trackingModal.order && (() => {
         const currentTrackingOrder = activeTrackingOrder || trackingModal.order;
@@ -1034,6 +1331,22 @@ export default function OrdersPage({ onNavigate, user }) {
                       </div>
                     </div>
                   </div>
+
+                  {/* 6-Digit Delivery OTP in Live Tracking */}
+                  {currentTrackingOrder.deliveryOtp && currentTrackingOrder.orderStatus !== 'Delivered' && (
+                    <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4 text-center">
+                      <div className="flex items-center justify-center gap-1.5 text-emerald-700 mb-1">
+                        <ShieldCheck size={14} />
+                        <span className="text-[10px] font-black uppercase tracking-widest">Delivery Verification OTP</span>
+                      </div>
+                      <div className="font-mono font-black text-3xl tracking-[0.25em] text-emerald-800 my-1 select-all">
+                        {currentTrackingOrder.deliveryOtp}
+                      </div>
+                      <p className="text-[10px] text-emerald-700/80 font-medium">
+                        Share this 6-digit OTP with your delivery partner upon arrival
+                      </p>
+                    </div>
+                  )}
 
                   {/* Distance & Time Metrics */}
                   <div className="grid grid-cols-2 gap-3">
