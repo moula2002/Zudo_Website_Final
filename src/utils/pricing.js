@@ -6,8 +6,24 @@ export function round2(val) {
 }
 
 /**
+ * Extracts numeric unit size or weight (e.g. "30 KG", "30kg", "30", 30 -> 30)
+ * Defaults to 1 if not specified, 0, or invalid.
+ */
+export function extractUnitSize(val, defaultVal = 1) {
+  if (val === undefined || val === null || val === '') return defaultVal;
+  if (typeof val === 'number') return val > 0 ? val : defaultVal;
+  const str = String(val).trim();
+  const match = str.match(/([0-9.]+)/);
+  if (match && !isNaN(parseFloat(match[1]))) {
+    const parsed = parseFloat(match[1]);
+    return parsed > 0 ? parsed : defaultVal;
+  }
+  return defaultVal;
+}
+
+/**
  * Calculates item and total pricing breakdown according to platform contract:
- * - Flat commission: Flat Commission Per Unit * Selected Quantity
+ * - Flat commission: Flat Commission Per Unit * Product Unit Size * Selected Quantity
  * - Percentage commission: (Seller Unit Price * (Commission Rate / 100)) * Selected Quantity
  * - GST rules:
  *     - B2B: GST added on top of totalCustomerBase (totalCustomerBase * (gstPercent / 100))
@@ -20,52 +36,90 @@ export function calculateItemPricing({
 }) {
   const qty = Math.max(1, parseInt(quantity, 10) || 1);
   
-  // Extract seller unit price
-  let sUnitPrice = 0;
-  if (item.priceTiers && item.priceTiers.length > 0) {
+  // Extract unit size
+  const uSize = extractUnitSize(item.unitSize || item.variantSize || item.packetSize, 1);
+
+  // Extract base seller price
+  let baseSellerPrice = 0;
+  if (item.sellerPricePerBaseUnit !== undefined && item.sellerPricePerBaseUnit !== null) {
+    baseSellerPrice = Number(item.sellerPricePerBaseUnit);
+  } else if (item.priceTiers && item.priceTiers.length > 0) {
     const sortedTiers = [...item.priceTiers].sort((a, b) => b.minQty - a.minQty);
     const activeTier = sortedTiers.find(t => qty >= t.minQty);
     if (activeTier) {
-      sUnitPrice = activeTier.sellerPrice !== undefined ? Number(activeTier.sellerPrice) : Number(activeTier.price);
+      baseSellerPrice = activeTier.sellerPrice !== undefined ? Number(activeTier.sellerPrice) : Number(activeTier.price);
     }
   }
-  if (!sUnitPrice) {
+  if (!baseSellerPrice) {
     if (isB2B) {
-      sUnitPrice = Number(item.sellerB2bPrice ?? item.sellerPrice ?? item.b2bPrice ?? item.price ?? 0);
+      baseSellerPrice = Number(item.sellerB2bPrice ?? item.sellerPrice ?? item.b2bPrice ?? item.price ?? 0);
     } else {
-      sUnitPrice = Number(item.sellerPrice ?? item.price ?? 0);
+      baseSellerPrice = Number(item.sellerPrice ?? item.price ?? 0);
     }
   }
 
-  // Extract commission rules
-  const cType = item.commissionType === 'percentage' ? 'percentage' : 'flat';
-  const cVal = Number(item.commissionValue ?? (cType === 'flat' ? item.commissionAmount : 0) ?? 0);
+  // Determine price basis: 'per_unit' (Method A) vs 'per_package' (Method B)
+  const isPackagePrice = item.priceBasis === 'per_package' || item.isPackagePrice === true;
 
-  let unitCommission = 0;
-  if (cType === 'flat') {
-    unitCommission = cVal;
+  // Step 1: Seller Price Per Product Unit (Complete Package)
+  let sellerPricePerProductUnit = 0;
+  let sellerPricePerBaseUnit = baseSellerPrice;
+
+  if (item.sellerPricePerProductUnit !== undefined && item.sellerPricePerProductUnit !== null) {
+    sellerPricePerProductUnit = Number(item.sellerPricePerProductUnit);
+    if (!isPackagePrice && item.sellerPricePerBaseUnit !== undefined) {
+      sellerPricePerBaseUnit = Number(item.sellerPricePerBaseUnit);
+    } else if (uSize > 0) {
+      sellerPricePerBaseUnit = round2(sellerPricePerProductUnit / uSize);
+    }
+  } else if (isPackagePrice) {
+    sellerPricePerProductUnit = round2(baseSellerPrice);
+    sellerPricePerBaseUnit = uSize > 0 ? round2(sellerPricePerProductUnit / uSize) : sellerPricePerProductUnit;
   } else {
-    unitCommission = (sUnitPrice * cVal) / 100;
+    sellerPricePerProductUnit = round2(baseSellerPrice * uSize);
+    sellerPricePerBaseUnit = round2(baseSellerPrice);
   }
-  unitCommission = round2(unitCommission);
 
-  const totalSellerPrice = round2(sUnitPrice * qty);
-  const totalCommission = round2(unitCommission * qty);
-  const totalCustomerBase = round2(totalSellerPrice + totalCommission);
+  // Step 2: Commission Per Product Unit (e.g. 2 * 30 = 60)
+  const cType = item.commissionType === 'percentage' ? 'percentage' : 'flat';
+  const cVal = Number(item.adminCommissionPerBaseUnit ?? item.commissionRate ?? item.commissionValue ?? 0);
 
+  let commissionPerProductUnit = 0;
+  if (item.commissionPerProductUnit !== undefined && item.commissionPerProductUnit !== null) {
+    commissionPerProductUnit = Number(item.commissionPerProductUnit);
+  } else if (cType === 'flat') {
+    commissionPerProductUnit = round2(cVal * uSize);
+  } else {
+    commissionPerProductUnit = round2((sellerPricePerProductUnit * cVal) / 100);
+  }
+
+  // Step 3: Customer Unit Base Price (1500 + 60 = 1560)
+  const customerUnitBasePrice = round2(sellerPricePerProductUnit + commissionPerProductUnit);
+
+  // Step 4: Total Seller Amount (1500 * 2 = 3000)
+  const totalSellerPrice = round2(sellerPricePerProductUnit * qty);
+
+  // Step 5: Total Commission (60 * 2 = 120)
+  const totalCommission = round2(commissionPerProductUnit * qty);
+
+  // Step 6: Subtotal (3000 + 120 = 3120)
+  const subtotal = round2(totalSellerPrice + totalCommission);
+  const totalProductWeight = round2(uSize * qty);
+
+  // Step 7: GST
   const gstRate = Number(item.gstPercent) || 0;
   let totalGst = 0;
-  let finalCustomerPrice = totalCustomerBase;
+  let finalCustomerPrice = subtotal;
 
   if (isB2B) {
-    totalGst = round2(totalCustomerBase * (gstRate / 100));
-    finalCustomerPrice = round2(totalCustomerBase + totalGst);
+    totalGst = round2(subtotal * (gstRate / 100));
+    finalCustomerPrice = round2(subtotal + totalGst);
   } else {
     if (gstRate > 0) {
-      const baseBeforeTax = totalCustomerBase / (1 + gstRate / 100);
-      totalGst = round2(totalCustomerBase - baseBeforeTax);
+      const baseBeforeTax = subtotal / (1 + gstRate / 100);
+      totalGst = round2(subtotal - baseBeforeTax);
     }
-    finalCustomerPrice = totalCustomerBase;
+    finalCustomerPrice = subtotal;
   }
 
   const unitCustomerPrice = round2(finalCustomerPrice / qty);
@@ -73,13 +127,26 @@ export function calculateItemPricing({
 
   return {
     quantity: qty,
-    sellerUnitPrice: sUnitPrice,
+    priceBasis: isPackagePrice ? 'per_package' : 'per_unit',
+    packagingType: (item.packagingType || item.unit || 'BAG').toUpperCase(),
+    measurementBasis: (item.measurementBasis || item.measurementUnit || 'KG').toUpperCase(),
+    sellerUnitPrice: sellerPricePerProductUnit,
+    sellerPricePerBaseUnit: sellerPricePerBaseUnit,
+    sellerPricePerProductUnit,
+    unit: item.unit || 'unit',
+    productMeasurementUnit: item.measurementUnit || item.unit || 'unit',
+    measurementUnit: item.measurementUnit || item.unit || 'unit',
+    unitSize: uSize,
+    totalProductWeight,
     commissionType: cType,
     commissionRate: cVal,
-    unitCommission,
+    unitCommission: commissionPerProductUnit,
+    commissionPerProductUnit,
+    customerUnitBasePrice,
     totalSellerPrice,
     totalCommission,
-    totalCustomerBase,
+    subtotal,
+    totalCustomerBase: subtotal,
     gstPercent: gstRate,
     unitGst,
     totalGst,

@@ -366,41 +366,76 @@ function App() {
     const variantsList = isB2B ? product.b2b : product.b2c;
     
     if (selectedVariant) {
+      const vUnitSize = Number(selectedVariant.unitSize || selectedVariant.sizeValue) > 0 ? Number(selectedVariant.unitSize || selectedVariant.sizeValue) : 1;
       varInfo = {
+        variantId: selectedVariant._id || selectedVariant.id,
         selectedPacketSize: selectedVariant.packetSize,
         price: selectedVariant.price,
         mrp: selectedVariant.mrp || selectedVariant.price,
         stock: selectedVariant.stock !== undefined ? selectedVariant.stock : product.stock,
         gstPercent: selectedVariant.gstPercent || product.gstPercent || 0,
+        priceBasis: selectedVariant.priceBasis || product.priceBasis || 'per_unit',
         sellerPrice: selectedVariant.sellerPrice !== undefined ? selectedVariant.sellerPrice : product.sellerPrice,
         commissionType: selectedVariant.commissionType || product.commissionType || 'flat',
         commissionValue: selectedVariant.commissionValue !== undefined ? selectedVariant.commissionValue : product.commissionValue,
-        commissionAmount: selectedVariant.commissionAmount !== undefined ? selectedVariant.commissionAmount : product.commissionAmount
+        commissionAmount: selectedVariant.commissionAmount !== undefined ? selectedVariant.commissionAmount : product.commissionAmount,
+        unitSize: vUnitSize,
+        measurementBasis: selectedVariant.measurementBasis || selectedVariant.measurementUnit || product.measurementBasis || product.measurementUnit || 'KG',
+        measurementUnit: selectedVariant.measurementUnit || selectedVariant.measurementBasis || product.measurementUnit || 'KG',
+        packagingType: selectedVariant.packagingType || product.packagingType || product.unit || 'BAG',
+        sellerPricePerBaseUnit: selectedVariant.sellerPricePerBaseUnit || product.sellerPricePerBaseUnit || 0,
+        sellerPricePerProductUnit: selectedVariant.sellerPricePerProductUnit || selectedVariant.sellerPrice || 0,
+        adminCommissionPerBaseUnit: selectedVariant.adminCommissionPerBaseUnit || product.adminCommissionPerBaseUnit || 0,
+        commissionPerProductUnit: selectedVariant.commissionPerProductUnit || selectedVariant.commissionAmount || 0,
+        customerUnitBasePrice: selectedVariant.customerUnitBasePrice || selectedVariant.price || 0
       };
     } else if (variantsList && variantsList.length > 0) {
       const defaultVar = variantsList[0];
+      const vUnitSize = Number(defaultVar.unitSize || defaultVar.sizeValue) > 0 ? Number(defaultVar.unitSize || defaultVar.sizeValue) : 1;
       varInfo = {
+        variantId: defaultVar._id || defaultVar.id,
         selectedPacketSize: defaultVar.packetSize,
         price: defaultVar.price,
         mrp: defaultVar.mrp || defaultVar.price,
         stock: defaultVar.stock !== undefined ? defaultVar.stock : product.stock,
         gstPercent: defaultVar.gstPercent || product.gstPercent || 0,
+        priceBasis: defaultVar.priceBasis || product.priceBasis || 'per_unit',
         sellerPrice: defaultVar.sellerPrice !== undefined ? defaultVar.sellerPrice : product.sellerPrice,
         commissionType: defaultVar.commissionType || product.commissionType || 'flat',
         commissionValue: defaultVar.commissionValue !== undefined ? defaultVar.commissionValue : product.commissionValue,
-        commissionAmount: defaultVar.commissionAmount !== undefined ? defaultVar.commissionAmount : product.commissionAmount
+        commissionAmount: defaultVar.commissionAmount !== undefined ? defaultVar.commissionAmount : product.commissionAmount,
+        unitSize: vUnitSize,
+        measurementBasis: defaultVar.measurementBasis || defaultVar.measurementUnit || product.measurementBasis || product.measurementUnit || 'KG',
+        measurementUnit: defaultVar.measurementUnit || defaultVar.measurementBasis || product.measurementUnit || 'KG',
+        packagingType: defaultVar.packagingType || product.packagingType || product.unit || 'BAG',
+        sellerPricePerBaseUnit: defaultVar.sellerPricePerBaseUnit || product.sellerPricePerBaseUnit || 0,
+        sellerPricePerProductUnit: defaultVar.sellerPricePerProductUnit || defaultVar.sellerPrice || 0,
+        adminCommissionPerBaseUnit: defaultVar.adminCommissionPerBaseUnit || product.adminCommissionPerBaseUnit || 0,
+        commissionPerProductUnit: defaultVar.commissionPerProductUnit || defaultVar.commissionAmount || 0,
+        customerUnitBasePrice: defaultVar.customerUnitBasePrice || defaultVar.price || 0
       };
     } else {
       varInfo = {
+        variantId: null,
         selectedPacketSize: product.unit || '1 unit',
         price: isB2B ? (product.b2bPrice || product.price) : product.price,
         mrp: product.oldPrice || (isB2B ? (product.b2bPrice || product.price) : product.price),
         stock: product.stock,
         gstPercent: product.gstPercent || 0,
+        priceBasis: product.priceBasis || 'per_unit',
         sellerPrice: isB2B ? (product.sellerB2bPrice || product.sellerPrice) : product.sellerPrice,
         commissionType: product.commissionType || 'flat',
         commissionValue: product.commissionValue || 0,
-        commissionAmount: product.commissionAmount || 0
+        commissionAmount: product.commissionAmount || 0,
+        unitSize: Number(product.unitSize) > 0 ? Number(product.unitSize) : 1,
+        measurementBasis: product.measurementBasis || product.measurementUnit || 'KG',
+        measurementUnit: product.measurementUnit || product.measurementBasis || 'KG',
+        packagingType: product.packagingType || product.unit || 'BAG',
+        sellerPricePerBaseUnit: product.sellerPricePerBaseUnit || 0,
+        sellerPricePerProductUnit: product.sellerPricePerProductUnit || (isB2B ? (product.sellerB2bPrice || product.sellerPrice) : product.sellerPrice) || 0,
+        adminCommissionPerBaseUnit: product.adminCommissionPerBaseUnit || 0,
+        commissionPerProductUnit: product.commissionPerProductUnit || product.commissionAmount || 0,
+        customerUnitBasePrice: product.customerUnitBasePrice || (isB2B ? (product.b2bPrice || product.price) : product.price) || 0
       };
     }
 
@@ -424,15 +459,26 @@ function App() {
       return [...prev, { 
         ...product, 
         cartKey, 
+        variantId: varInfo.variantId,
         selectedPacketSize: varInfo.selectedPacketSize,
         price: varInfo.price,
         oldPrice: varInfo.mrp,
         stock: varInfo.stock,
         gstPercent: varInfo.gstPercent,
+        priceBasis: varInfo.priceBasis,
         sellerPrice: varInfo.sellerPrice,
         commissionType: varInfo.commissionType,
         commissionValue: varInfo.commissionValue,
         commissionAmount: varInfo.commissionAmount,
+        unitSize: varInfo.unitSize,
+        measurementBasis: varInfo.measurementBasis,
+        measurementUnit: varInfo.measurementUnit,
+        packagingType: varInfo.packagingType,
+        sellerPricePerBaseUnit: varInfo.sellerPricePerBaseUnit,
+        sellerPricePerProductUnit: varInfo.sellerPricePerProductUnit,
+        adminCommissionPerBaseUnit: varInfo.adminCommissionPerBaseUnit,
+        commissionPerProductUnit: varInfo.commissionPerProductUnit,
+        customerUnitBasePrice: varInfo.customerUnitBasePrice,
         quantity: initialQty 
       }];
     });

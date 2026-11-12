@@ -45,13 +45,28 @@ export default function ProductDetails({ product, onAddToCart, onToggleWishlist,
   const [selectedQty, setSelectedQty] = useState(isB2B ? (product?.moq || 1) : 1);
   const displayQty = currentQuantity > 0 ? currentQuantity : (selectedQty || (isB2B ? (product?.moq || 1) : 1));
 
+  const activeVariantUnitSize = selectedVariant 
+    ? (Number(selectedVariant.unitSize || selectedVariant.sizeValue) > 0 ? Number(selectedVariant.unitSize || selectedVariant.sizeValue) : 1)
+    : (Number(product?.unitSize) > 0 ? Number(product?.unitSize) : 1);
+
   const currentItemPayload = {
     ...product,
+    variantId: selectedVariant?._id || selectedVariant?.id,
+    priceBasis: selectedVariant?.priceBasis || product?.priceBasis || 'per_unit',
     sellerPrice: selectedVariant?.sellerPrice !== undefined ? selectedVariant.sellerPrice : product?.sellerPrice,
     sellerB2bPrice: selectedVariant?.sellerB2bPrice !== undefined ? selectedVariant.sellerB2bPrice : product?.sellerB2bPrice,
     commissionType: selectedVariant?.commissionType || product?.commissionType || 'flat',
     commissionValue: selectedVariant?.commissionValue !== undefined ? selectedVariant.commissionValue : product?.commissionValue,
     commissionAmount: selectedVariant?.commissionAmount !== undefined ? selectedVariant.commissionAmount : product?.commissionAmount,
+    unitSize: activeVariantUnitSize,
+    unit: product?.unit || 'unit',
+    measurementBasis: selectedVariant?.measurementBasis || selectedVariant?.measurementUnit || product?.measurementBasis || product?.measurementUnit || 'KG',
+    measurementUnit: selectedVariant?.measurementUnit || selectedVariant?.measurementBasis || product?.measurementUnit || 'KG',
+    packagingType: selectedVariant?.packagingType || product?.packagingType || product?.unit || 'BAG',
+    sellerPricePerBaseUnit: selectedVariant?.sellerPricePerBaseUnit || product?.sellerPricePerBaseUnit,
+    sellerPricePerProductUnit: selectedVariant?.sellerPricePerProductUnit || selectedVariant?.sellerPrice,
+    adminCommissionPerBaseUnit: selectedVariant?.adminCommissionPerBaseUnit || product?.adminCommissionPerBaseUnit,
+    commissionPerProductUnit: selectedVariant?.commissionPerProductUnit || selectedVariant?.commissionAmount,
     price: rawPrice,
     priceTiers: selectedVariant?.priceTiers || product?.priceTiers,
     gstPercent: activeGst
@@ -378,7 +393,7 @@ export default function ProductDetails({ product, onAddToCart, onToggleWishlist,
               )}
             </div>
 
-            {/* Stock Quantity-Based Flat Commission & Price Breakdown */}
+            {/* Measurement-Based Commission & Price Breakdown */}
             {!isPending && (
               <div className="mb-6 p-4 bg-emerald-50/60 dark:bg-emerald-500/10 rounded-2xl border border-emerald-100 dark:border-emerald-500/20">
                 <div className="flex items-center justify-between mb-3 border-b border-emerald-100/60 pb-2">
@@ -388,22 +403,23 @@ export default function ProductDetails({ product, onAddToCart, onToggleWishlist,
                       Pricing & Commission Breakdown
                     </span>
                   </div>
-                  <span className="text-[10px] font-bold text-gray-500">
-                    Selected Qty: <strong className="text-emerald-700">{displayQty}</strong>
+                  <span className="text-[11px] font-bold text-gray-700 dark:text-gray-300">
+                    Package: <strong className="text-emerald-700 dark:text-emerald-400">1 {pricingBreakdown.packagingType || 'BAG'} = {pricingBreakdown.unitSize} {pricingBreakdown.measurementBasis || 'KG'}</strong>
                   </span>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 text-xs mb-3">
                   <div className="bg-white/80 dark:bg-black/20 p-2.5 rounded-xl border border-emerald-100/40">
-                    <p className="text-[9px] font-black uppercase text-gray-400 tracking-wider">Commission Per Unit</p>
+                    <p className="text-[9px] font-black uppercase text-gray-400 tracking-wider">Commission Per Package</p>
                     <p className="font-black text-gray-800 dark:text-gray-200 text-sm mt-0.5">
-                      {pricingBreakdown.commissionType === 'flat' 
-                        ? `₹${pricingBreakdown.unitCommission} / unit` 
-                        : `${pricingBreakdown.commissionRate}% (₹${pricingBreakdown.unitCommission})`}
+                      ₹{pricingBreakdown.unitCommission}
+                      <span className="text-[10px] font-normal text-gray-500 ml-1">
+                        (₹{pricingBreakdown.commissionRate} × {pricingBreakdown.unitSize} {pricingBreakdown.measurementBasis || 'KG'})
+                      </span>
                     </p>
                   </div>
                   <div className="bg-white/80 dark:bg-black/20 p-2.5 rounded-xl border border-emerald-100/40">
-                    <p className="text-[9px] font-black uppercase text-gray-400 tracking-wider">Total Commission ({displayQty} units)</p>
+                    <p className="text-[9px] font-black uppercase text-gray-400 tracking-wider">Total Commission ({displayQty} {pricingBreakdown.packagingType || 'packs'})</p>
                     <p className="font-black text-emerald-600 text-sm mt-0.5">
                       ₹{pricingBreakdown.totalCommission}
                       {displayQty > 1 && (
@@ -417,7 +433,8 @@ export default function ProductDetails({ product, onAddToCart, onToggleWishlist,
 
                 <div className="flex items-center justify-between pt-2 border-t border-emerald-100/60 text-xs">
                   <span className="text-gray-600 font-bold">
-                    Seller Total: ₹{pricingBreakdown.totalSellerPrice}
+                    Seller: ₹{pricingBreakdown.totalSellerPrice}
+                    {pricingBreakdown.totalProductWeight > 0 && ` (${pricingBreakdown.totalProductWeight} ${pricingBreakdown.measurementBasis || 'KG'})`}
                     {activeGst > 0 && ` + GST (₹${pricingBreakdown.totalGst})`}
                   </span>
                   <div className="text-right">

@@ -160,12 +160,20 @@ export default function CheckoutPage({ cartItems, onNavigate, user, onOrderSucce
         let basePrice = getItemPrice(item);
 
         return {
-          product: item.id,
+          product: item.id || item._id,
+          variantId: item.variantId || null,
           name: item.name,
           image: item.image,
           quantity: item.quantity,
           price: basePrice,
           selectedPacketSize: item.selectedPacketSize || null,
+          unitSize: Number(item.unitSize) > 0 ? Number(item.unitSize) : 1,
+          unit: item.unit || 'unit',
+          measurementBasis: (item.measurementBasis || item.measurementUnit || 'KG').toUpperCase(),
+          measurementUnit: (item.measurementUnit || item.measurementBasis || 'KG').toUpperCase(),
+          packagingType: (item.packagingType || item.unit || 'BAG').toUpperCase(),
+          priceBasis: item.priceBasis || 'per_unit',
+          sellerPrice: item.sellerPrice,
           sellerName: item.sellerName || 'Zudo Official'
         };
       }),
