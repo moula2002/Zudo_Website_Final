@@ -85,7 +85,7 @@ export default function CheckoutPage({ cartItems, onNavigate, user, onOrderSucce
       basePrice = parseFloat(cleanedPrice) || 0;
     }
 
-    // Prices returned from backend API are already inclusive of commissions and GST
+    // Item price from backend is already the final price
     return basePrice;
   };
 

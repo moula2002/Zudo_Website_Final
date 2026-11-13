@@ -33,7 +33,7 @@ export default function ProductDetails({ product, onAddToCart, onToggleWishlist,
   const activeGst = selectedVariant ? (selectedVariant.gstPercent || product?.gstPercent || 0) : (product?.gstPercent || 0);
   const activeMoq = isB2B ? (product?.moq || 1) : 1;
   
-  // Prices returned from backend API are already inclusive of commissions and GST
+  // Authoritative final pricing from backend (inclusive of commission and applicable GST)
   const activePrice = rawPrice;
   const activeMrp = rawMrp;
 
@@ -334,7 +334,7 @@ export default function ProductDetails({ product, onAddToCart, onToggleWishlist,
                   {product.priceTiers.sort((a, b) => a.minQty - b.minQty).map((tier, idx) => (
                     <div key={idx} className="bg-white dark:bg-white/5 p-3 rounded-xl border border-emerald-100 dark:border-white/10 flex items-center justify-between">
                       <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">{tier.minQty}+ {activeSize}</p>
-                      <p className="text-sm font-black text-emerald-600 dark:text-emerald-400">₹{tier.price}</p>
+                      <p className="text-sm font-black text-emerald-600 dark:text-emerald-400">₹{isB2B ? Number((tier.price * (1 + activeGst / 100)).toFixed(2)) : tier.price}</p>
                     </div>
                   ))}
                 </div>

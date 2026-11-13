@@ -58,29 +58,12 @@ export function calculateItemPricing({
     }
   }
 
-  // Determine price basis: 'per_unit' (Method A) vs 'per_package' (Method B)
-  const isPackagePrice = item.priceBasis === 'per_package' || item.isPackagePrice === true;
+  // Step 1: Seller Price Per Product Unit (Package / Purchasable Item)
+  // Seller Unit Price is configured price for 1 purchasable package/unit. Never multiply it by unit size.
+  const sellerPricePerProductUnit = round2(baseSellerPrice);
+  const sellerPricePerBaseUnit = uSize > 0 ? round2(sellerPricePerProductUnit / uSize) : sellerPricePerProductUnit;
 
-  // Step 1: Seller Price Per Product Unit (Complete Package)
-  let sellerPricePerProductUnit = 0;
-  let sellerPricePerBaseUnit = baseSellerPrice;
-
-  if (item.sellerPricePerProductUnit !== undefined && item.sellerPricePerProductUnit !== null) {
-    sellerPricePerProductUnit = Number(item.sellerPricePerProductUnit);
-    if (!isPackagePrice && item.sellerPricePerBaseUnit !== undefined) {
-      sellerPricePerBaseUnit = Number(item.sellerPricePerBaseUnit);
-    } else if (uSize > 0) {
-      sellerPricePerBaseUnit = round2(sellerPricePerProductUnit / uSize);
-    }
-  } else if (isPackagePrice) {
-    sellerPricePerProductUnit = round2(baseSellerPrice);
-    sellerPricePerBaseUnit = uSize > 0 ? round2(sellerPricePerProductUnit / uSize) : sellerPricePerProductUnit;
-  } else {
-    sellerPricePerProductUnit = round2(baseSellerPrice * uSize);
-    sellerPricePerBaseUnit = round2(baseSellerPrice);
-  }
-
-  // Step 2: Commission Per Product Unit based on actual Product Unit Size (e.g. 20 * 30 = 600)
+  // Step 2: Total Commission Per Product Unit = Product Unit Size * Admin Commission Per Unit
   const cType = item.commissionType === 'percentage' ? 'percentage' : 'flat';
   const cVal = Number(item.adminCommissionPerBaseUnit ?? item.commissionRate ?? item.commissionValue ?? 0);
 
@@ -91,30 +74,35 @@ export function calculateItemPricing({
     commissionPerProductUnit = round2((sellerPricePerProductUnit * cVal) / 100);
   }
 
-  // Step 3: Customer Unit Base Price (e.g. 1500 + 600 = 2100)
+  // Step 3: Customer Unit Base Price = Seller Unit Price + Total Commission
   const customerUnitBasePrice = round2(sellerPricePerProductUnit + commissionPerProductUnit);
 
-  // Step 4: Total Seller Amount (e.g. 1500 * 2 = 3000)
+  // Step 4: Seller Total Price = Quantity * Seller Unit Price
   const totalSellerPrice = round2(sellerPricePerProductUnit * qty);
 
-  // Step 5: Total Weight & Total Commission (Total Weight = Qty * UnitSize, Total Comm = Total Weight * Rate)
+  // Step 5: Total Weight = Quantity * Product Unit Size
   const totalProductWeight = round2(uSize * qty);
+
+  // Step 6: Total Commission = Quantity * Product Unit Size * Admin Commission Per Unit
   const totalCommission = cType === 'flat' ? round2(totalProductWeight * cVal) : round2(commissionPerProductUnit * qty);
 
-  // Step 7: GST
+  // Step 7: Customer Base Price (Subtotal) = Seller Total Price + Total Commission
+  const subtotal = round2(totalSellerPrice + totalCommission);
+
+  // Step 8: GST Amount = Customer Base Price * GST Percentage / 100
   const gstRate = Number(item.gstPercent) || 0;
   let totalGst = 0;
   let finalCustomerPrice = subtotal;
 
-  if (isB2B) {
-    totalGst = round2(subtotal * (gstRate / 100));
-    finalCustomerPrice = round2(subtotal + totalGst);
-  } else {
-    if (gstRate > 0) {
+  if (gstRate > 0) {
+    if (item.isGstInclusive) {
       const baseBeforeTax = subtotal / (1 + gstRate / 100);
       totalGst = round2(subtotal - baseBeforeTax);
+      finalCustomerPrice = subtotal;
+    } else {
+      totalGst = round2(subtotal * (gstRate / 100));
+      finalCustomerPrice = round2(subtotal + totalGst);
     }
-    finalCustomerPrice = subtotal;
   }
 
   const unitCustomerPrice = round2(finalCustomerPrice / qty);
