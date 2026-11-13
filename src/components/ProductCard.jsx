@@ -34,7 +34,7 @@ export default function ProductCard({ product, onAddToCart, onUpdateQuantity, on
   const activeGst = selectedVariant ? (selectedVariant.gstPercent || product.gstPercent || 0) : (product.gstPercent || 0);
   const activeMoq = product.isB2B ? (product.moq || 1) : 1;
   
-  // Authoritative final pricing from backend (inclusive of commission and applicable GST)
+  // Prices returned from backend API are already inclusive of commissions and GST
   const activePrice = rawPrice;
   const activeMrp = rawMrp;
 
