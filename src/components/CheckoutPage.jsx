@@ -85,11 +85,7 @@ export default function CheckoutPage({ cartItems, onNavigate, user, onOrderSucce
       basePrice = parseFloat(cleanedPrice) || 0;
     }
 
-    // For B2B, include GST in the displayed checkout price
-    if (isB2B && item.gstPercent) {
-      return Number((basePrice * (1 + item.gstPercent / 100)).toFixed(2));
-    }
-
+    // Prices returned from backend API are already inclusive of commissions and GST
     return basePrice;
   };
 

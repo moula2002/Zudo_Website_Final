@@ -34,9 +34,9 @@ export default function ProductCard({ product, onAddToCart, onUpdateQuantity, on
   const activeGst = selectedVariant ? (selectedVariant.gstPercent || product.gstPercent || 0) : (product.gstPercent || 0);
   const activeMoq = product.isB2B ? (product.moq || 1) : 1;
   
-  // For B2B, prices in the database are exclusive of GST, but we want to show them inclusive of GST
-  const activePrice = (product.isB2B && rawPrice != null) ? Number((rawPrice * (1 + activeGst / 100)).toFixed(2)) : rawPrice;
-  const activeMrp = (product.isB2B && rawMrp != null) ? Number((rawMrp * (1 + activeGst / 100)).toFixed(2)) : rawMrp;
+  // Prices returned from backend API are already inclusive of commissions and GST
+  const activePrice = rawPrice;
+  const activeMrp = rawMrp;
 
   // Uniquely identify the selected item size variant in the shopping cart
   const cartItemKey = `${product.id}_${activeSize}`;

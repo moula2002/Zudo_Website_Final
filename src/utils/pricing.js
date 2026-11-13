@@ -80,31 +80,26 @@ export function calculateItemPricing({
     sellerPricePerBaseUnit = round2(baseSellerPrice);
   }
 
-  // Step 2: Commission Per Product Unit (e.g. 2 * 30 = 60)
+  // Step 2: Commission Per Product Unit based on actual Product Unit Size (e.g. 20 * 30 = 600)
   const cType = item.commissionType === 'percentage' ? 'percentage' : 'flat';
   const cVal = Number(item.adminCommissionPerBaseUnit ?? item.commissionRate ?? item.commissionValue ?? 0);
 
   let commissionPerProductUnit = 0;
-  if (item.commissionPerProductUnit !== undefined && item.commissionPerProductUnit !== null) {
-    commissionPerProductUnit = Number(item.commissionPerProductUnit);
-  } else if (cType === 'flat') {
+  if (cType === 'flat') {
     commissionPerProductUnit = round2(cVal * uSize);
   } else {
     commissionPerProductUnit = round2((sellerPricePerProductUnit * cVal) / 100);
   }
 
-  // Step 3: Customer Unit Base Price (1500 + 60 = 1560)
+  // Step 3: Customer Unit Base Price (e.g. 1500 + 600 = 2100)
   const customerUnitBasePrice = round2(sellerPricePerProductUnit + commissionPerProductUnit);
 
-  // Step 4: Total Seller Amount (1500 * 2 = 3000)
+  // Step 4: Total Seller Amount (e.g. 1500 * 2 = 3000)
   const totalSellerPrice = round2(sellerPricePerProductUnit * qty);
 
-  // Step 5: Total Commission (60 * 2 = 120)
-  const totalCommission = round2(commissionPerProductUnit * qty);
-
-  // Step 6: Subtotal (3000 + 120 = 3120)
-  const subtotal = round2(totalSellerPrice + totalCommission);
+  // Step 5: Total Weight & Total Commission (Total Weight = Qty * UnitSize, Total Comm = Total Weight * Rate)
   const totalProductWeight = round2(uSize * qty);
+  const totalCommission = cType === 'flat' ? round2(totalProductWeight * cVal) : round2(commissionPerProductUnit * qty);
 
   // Step 7: GST
   const gstRate = Number(item.gstPercent) || 0;

@@ -33,9 +33,9 @@ export default function ProductDetails({ product, onAddToCart, onToggleWishlist,
   const activeGst = selectedVariant ? (selectedVariant.gstPercent || product?.gstPercent || 0) : (product?.gstPercent || 0);
   const activeMoq = isB2B ? (product?.moq || 1) : 1;
   
-  // For B2B, prices in the database are exclusive of GST, but we want to show them inclusive of GST
-  const activePrice = (isB2B && rawPrice != null) ? Number((rawPrice * (1 + activeGst / 100)).toFixed(2)) : rawPrice;
-  const activeMrp = (isB2B && rawMrp != null) ? Number((rawMrp * (1 + activeGst / 100)).toFixed(2)) : rawMrp;
+  // Prices returned from backend API are already inclusive of commissions and GST
+  const activePrice = rawPrice;
+  const activeMrp = rawMrp;
 
   // Uniquely identify the selected item size variant in the shopping cart
   const cartItemKey = `${product?.id}_${activeSize}`;
@@ -334,7 +334,7 @@ export default function ProductDetails({ product, onAddToCart, onToggleWishlist,
                   {product.priceTiers.sort((a, b) => a.minQty - b.minQty).map((tier, idx) => (
                     <div key={idx} className="bg-white dark:bg-white/5 p-3 rounded-xl border border-emerald-100 dark:border-white/10 flex items-center justify-between">
                       <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">{tier.minQty}+ {activeSize}</p>
-                      <p className="text-sm font-black text-emerald-600 dark:text-emerald-400">₹{isB2B ? Number((tier.price * (1 + activeGst / 100)).toFixed(2)) : tier.price}</p>
+                      <p className="text-sm font-black text-emerald-600 dark:text-emerald-400">₹{tier.price}</p>
                     </div>
                   ))}
                 </div>
@@ -419,14 +419,12 @@ export default function ProductDetails({ product, onAddToCart, onToggleWishlist,
                     </p>
                   </div>
                   <div className="bg-white/80 dark:bg-black/20 p-2.5 rounded-xl border border-emerald-100/40">
-                    <p className="text-[9px] font-black uppercase text-gray-400 tracking-wider">Total Commission ({displayQty} {pricingBreakdown.packagingType || 'packs'})</p>
+                    <p className="text-[9px] font-black uppercase text-gray-400 tracking-wider">Total Commission ({pricingBreakdown.totalProductWeight} {pricingBreakdown.measurementBasis || 'KG'})</p>
                     <p className="font-black text-emerald-600 text-sm mt-0.5">
                       ₹{pricingBreakdown.totalCommission}
-                      {displayQty > 1 && (
-                        <span className="text-[9px] font-normal text-gray-400 ml-1">
-                          (₹{pricingBreakdown.unitCommission} × {displayQty})
-                        </span>
-                      )}
+                      <span className="text-[9px] font-normal text-gray-400 ml-1">
+                        ({pricingBreakdown.totalProductWeight} {pricingBreakdown.measurementBasis || 'KG'} × ₹{pricingBreakdown.commissionRate})
+                      </span>
                     </p>
                   </div>
                 </div>
