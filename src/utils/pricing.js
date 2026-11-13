@@ -41,8 +41,10 @@ export function calculateItemPricing({
 
   // Extract base seller price
   let baseSellerPrice = 0;
-  if (item.sellerPricePerBaseUnit !== undefined && item.sellerPricePerBaseUnit !== null) {
-    baseSellerPrice = Number(item.sellerPricePerBaseUnit);
+  if (item.sellerPricePerProductUnit !== undefined && item.sellerPricePerProductUnit !== null && Number(item.sellerPricePerProductUnit) > 0) {
+    baseSellerPrice = Number(item.sellerPricePerProductUnit);
+  } else if (item.sellerPrice !== undefined && item.sellerPrice !== null && Number(item.sellerPrice) > 0) {
+    baseSellerPrice = Number(item.sellerPrice);
   } else if (item.priceTiers && item.priceTiers.length > 0) {
     const sortedTiers = [...item.priceTiers].sort((a, b) => b.minQty - a.minQty);
     const activeTier = sortedTiers.find(t => qty >= t.minQty);
@@ -56,6 +58,10 @@ export function calculateItemPricing({
     } else {
       baseSellerPrice = Number(item.sellerPrice ?? item.price ?? 0);
     }
+  }
+  if (!baseSellerPrice && item.sellerPricePerBaseUnit !== undefined && item.sellerPricePerBaseUnit !== null && Number(item.sellerPricePerBaseUnit) > 0) {
+    const perBase = Number(item.sellerPricePerBaseUnit);
+    baseSellerPrice = (item.priceBasis === 'per_package' && uSize > 1) ? (perBase * uSize) : perBase;
   }
 
   // Determine price basis: 'per_unit' (Method A) vs 'per_package' (Method B)
